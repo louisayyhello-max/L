@@ -1,0 +1,116 @@
+# 食品添加剂市场情报系统配置
+
+# ── 品类关键词 ──────────────────────────────────────────────
+categories:
+  sweeteners:
+    zh: ["甜味剂", "赤藓糖醇", "甜菊糖", "阿洛酮糖", "木糖醇", "阿斯巴甜", "三氯蔗糖", "安赛蜜", "糖醇", "低糖", "代糖"]
+    en: ["sweetener", "erythritol", "stevia", "allulose", "xylitol", "aspartame", "sucralose", "acesulfame", "sugar alcohol", "low sugar", "sugar substitute"]
+    trade_codes: ["2940", "2102"]  # HS编码参考
+
+  colorants:
+    zh: ["食用色素", "天然色素", "β-胡萝卜素", "花青素", "姜黄素", "叶绿素", "胭脂红", "亮蓝", "日落黄"]
+    en: ["food color", "food dye", "natural colorant", "beta carotene", "anthocyanin", "curcumin", "chlorophyll", "carmine", "brilliant blue"]
+    trade_codes: ["3204"]
+
+  flavors:
+    zh: ["食品香料", "香精", "天然香料", "合成香料", "调味料", "风味物质", "FEMA"]
+    en: ["food flavor", "flavor ingredient", "natural flavor", "synthetic flavor", "flavoring", "aroma compound", "FEMA GRAS"]
+    trade_codes: ["3302", "3301"]
+
+  functional_ingredients:
+    zh: ["新食品原料", "功能性食品", "益生菌", "植物提取物", "胶原蛋白", "透明质酸", "NMN", "人参提取物", "姜黄提取物", "功能成分"]
+    en: ["novel food ingredient", "functional ingredient", "probiotic", "plant extract", "collagen", "hyaluronic acid", "NMN", "botanical extract", "nutraceutical"]
+    trade_codes: ["2106", "1302"]
+
+# ── 目标市场 ──────────────────────────────────────────────
+markets:
+  china:
+    name: "中国"
+    regulators: ["国家卫生健康委员会", "市场监管总局", "海关总署", "农业农村部"]
+    reg_keywords: ["GB 2760", "新食品原料", "食品添加剂公告", "卫健委公告", "NHSA", "SAMR"]
+
+  eu:
+    name: "欧盟"
+    regulators: ["EFSA", "European Commission", "DG SANTE"]
+    reg_keywords: ["EFSA opinion", "EU food additive", "novel food regulation", "Regulation EC 1333/2008", "E-number"]
+
+  usa:
+    name: "美国"
+    regulators: ["FDA", "USDA", "EPA"]
+    reg_keywords: ["FDA GRAS", "food additive petition", "21 CFR", "FEMA GRAS", "color additive"]
+
+  southeast_asia:
+    name: "东南亚"
+    countries: ["Vietnam", "Thailand", "Indonesia", "Malaysia", "Philippines", "Singapore"]
+    reg_keywords: ["CODEX", "ASEAN food", "Thai FDA", "BPOM", "HSA Singapore", "SSO Vietnam"]
+
+  middle_east_africa:
+    name: "中东及非洲"
+    countries: ["UAE", "Saudi Arabia", "Egypt", "South Africa", "Nigeria", "Kenya"]
+    reg_keywords: ["GCC food standard", "SFDA Saudi", "ESMA UAE", "Halal", "NAFDAC Nigeria"]
+
+# ── 数据源 RSS ──────────────────────────────────────────────
+rss_feeds:
+  # 食品行业媒体
+  trade_media:
+    - name: "FoodNavigator Global"
+      url: "https://www.foodnavigator.com/rss/feed"
+      region: "global"
+    - name: "FoodNavigator USA"
+      url: "https://www.foodnavigator-usa.com/rss/feed"
+      region: "usa"
+    - name: "FoodNavigator Asia"
+      url: "https://www.foodnavigator-asia.com/rss/feed"
+      region: "asia"
+    - name: "Nutraingredients"
+      url: "https://www.nutraingredients.com/rss/feed"
+      region: "global"
+    - name: "Nutraingredients USA"
+      url: "https://www.nutraingredients-usa.com/rss/feed"
+      region: "usa"
+    - name: "Nutraingredients Asia"
+      url: "https://www.nutraingredients-asia.com/rss/feed"
+      region: "asia"
+    - name: "Food Business News"
+      url: "https://www.foodbusinessnews.net/rss/feed"
+      region: "usa"
+    - name: "Food Dive"
+      url: "https://www.fooddive.com/feeds/news/"
+      region: "usa"
+    - name: "Food Ingredients First"
+      url: "https://www.foodingredientsfirst.com/rss.xml"
+      region: "global"
+
+  # 监管机构
+  regulators:
+    - name: "FDA Food Safety News"
+      url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/food/rss.xml"
+      region: "usa"
+    - name: "EFSA News"
+      url: "https://www.efsa.europa.eu/en/rss/rss.xml"
+      region: "eu"
+
+  # 综合新闻（Google News关键词）
+  google_news_topics:
+    - query: "food additives regulation 2025"
+      lang: "en"
+    - query: "sweetener market"
+      lang: "en"
+    - query: "食品添加剂 法规"
+      lang: "zh-CN"
+    - query: "食品香料 市场"
+      lang: "zh-CN"
+
+# ── 系统配置 ──────────────────────────────────────────────
+system:
+  db_path: "database/intelligence.db"
+  dashboard_path: "dashboard/index.html"
+  update_interval_hours: 6       # 每6小时更新一次
+  max_articles_per_feed: 30      # 每个源最多抓取条数
+  article_retention_days: 180    # 保留180天数据
+  language: ["zh", "en"]
+
+# ── 可选：NewsAPI（如有Key则填入）──────────────────────────
+newsapi:
+  key: ""  # 填入 NewsAPI key 可获取更多新闻源
+  # 免费: https://newsapi.org（每天100次请求）

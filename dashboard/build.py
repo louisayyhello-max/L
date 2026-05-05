@@ -1,0 +1,458 @@
+"""
+Generate a self-contained HTML dashboard from the intelligence database.
+No server required — just open dashboard/index.html in a browser.
+"""
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from database.store import query_dashboard_data
+
+
+CATEGORY_LABELS = {
+    "sweeteners": "甜味剂",
+    "colorants": "食用色素",
+    "flavors": "食品香料",
+    "functional_ingredients": "功能新食品原料",
+    "general": "综合",
+}
+REGION_LABELS = {
+    "china": "🇨🇳 中国",
+    "eu": "🇪🇺 欧盟",
+    "usa": "🇺🇸 美国",
+    "sea": "🌏 东南亚",
+    "mea": "🌍 中东/非洲",
+    "global": "🌐 全球",
+}
+TYPE_LABELS = {
+    "news": "行业动态",
+    "regulatory": "法规监管",
+    "market": "市场信号",
+    "competitor": "竞争情报",
+}
+TYPE_COLORS = {
+    "news": "#3b82f6",
+    "regulatory": "#ef4444",
+    "market": "#10b981",
+    "competitor": "#f59e0b",
+}
+
+
+def _build_html(data: dict, generated_at: str) -> str:
+    recent_json = json.dumps(data["recent"], ensure_ascii=False)
+    cat_json = json.dumps(data["cat_counts"], ensure_ascii=False)
+    region_json = json.dumps(data["region_counts"], ensure_ascii=False)
+    regulatory_json = json.dumps(data["regulatory"], ensure_ascii=False)
+    trend_json = json.dumps(data["trend"], ensure_ascii=False)
+    fetch_log_json = json.dumps(data["fetch_log"], ensure_ascii=False)
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食品添加剂市场情报看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {{
+    --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+    --accent: #38bdf8; --text: #e2e8f0; --muted: #94a3b8;
+    --sweeteners: #a78bfa; --colorants: #f472b6;
+    --flavors: #34d399; --functional_ingredients: #fb923c; --general: #60a5fa;
+    --news: #3b82f6; --regulatory: #ef4444; --market: #10b981; --competitor: #f59e0b;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: var(--bg); color: var(--text); font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; font-size: 14px; }}
+  header {{ background: var(--surface); border-bottom: 1px solid var(--surface2); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }}
+  header h1 {{ font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }}
+  header .meta {{ color: var(--muted); font-size: 12px; }}
+  .layout {{ display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 57px); }}
+  /* Sidebar */
+  aside {{ background: var(--surface); border-right: 1px solid var(--surface2); padding: 16px 0; }}
+  .sidebar-section {{ padding: 8px 16px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }}
+  .filter-btn {{ display: block; width: 100%; padding: 8px 20px; text-align: left; background: none; border: none; color: var(--text); cursor: pointer; font-size: 13px; border-left: 3px solid transparent; transition: all 0.15s; }}
+  .filter-btn:hover {{ background: var(--surface2); color: var(--accent); }}
+  .filter-btn.active {{ border-left-color: var(--accent); background: rgba(56,189,248,0.08); color: var(--accent); font-weight: 600; }}
+  .filter-btn .badge {{ float: right; background: var(--surface2); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--muted); }}
+  /* Main */
+  main {{ overflow-y: auto; padding: 20px; }}
+  .section-title {{ font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 20px; }}
+  .section-title:first-child {{ margin-top: 0; }}
+  /* Stats row */
+  .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }}
+  .stat-card {{ background: var(--surface); border-radius: 8px; padding: 14px 16px; border: 1px solid var(--surface2); }}
+  .stat-card .num {{ font-size: 28px; font-weight: 800; color: var(--accent); }}
+  .stat-card .label {{ color: var(--muted); font-size: 12px; margin-top: 2px; }}
+  /* Charts */
+  .charts-row {{ display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-bottom: 20px; }}
+  .chart-card {{ background: var(--surface); border-radius: 8px; padding: 16px; border: 1px solid var(--surface2); }}
+  .chart-card h3 {{ font-size: 13px; color: var(--muted); margin-bottom: 12px; }}
+  .chart-card canvas {{ max-height: 200px; }}
+  /* Search */
+  .search-bar {{ display: flex; gap: 8px; margin-bottom: 16px; }}
+  .search-bar input {{ flex: 1; background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; }}
+  .search-bar input:focus {{ border-color: var(--accent); }}
+  .search-bar select {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }}
+  /* Feed */
+  #feed {{ display: flex; flex-direction: column; gap: 8px; }}
+  .feed-item {{ background: var(--surface); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--surface2); border-left: 3px solid var(--news); transition: border-color 0.15s; cursor: pointer; }}
+  .feed-item:hover {{ border-color: var(--accent); }}
+  .feed-item .item-header {{ display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }}
+  .feed-item h4 {{ font-size: 14px; font-weight: 600; flex: 1; line-height: 1.4; }}
+  .feed-item h4 a {{ color: var(--text); text-decoration: none; }}
+  .feed-item h4 a:hover {{ color: var(--accent); }}
+  .feed-item .summary {{ color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }}
+  .feed-item .meta {{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }}
+  .tag {{ display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }}
+  .tag-type-news {{ background: rgba(59,130,246,0.15); color: #93c5fd; }}
+  .tag-type-regulatory {{ background: rgba(239,68,68,0.15); color: #fca5a5; }}
+  .tag-type-market {{ background: rgba(16,185,129,0.15); color: #6ee7b7; }}
+  .tag-type-competitor {{ background: rgba(245,158,11,0.15); color: #fcd34d; }}
+  .tag-cat {{ background: rgba(148,163,184,0.1); color: var(--muted); }}
+  .tag-region {{ background: rgba(148,163,184,0.1); color: var(--muted); }}
+  .item-date {{ color: var(--muted); font-size: 11px; }}
+  .item-source {{ color: var(--muted); font-size: 11px; }}
+  .relevance-dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }}
+  /* Pagination */
+  .pagination {{ display: flex; gap: 6px; justify-content: center; margin-top: 16px; }}
+  .page-btn {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 6px 12px; color: var(--text); cursor: pointer; font-size: 13px; }}
+  .page-btn.active {{ background: var(--accent); color: #0f172a; font-weight: 700; border-color: var(--accent); }}
+  .page-btn:hover:not(.active) {{ border-color: var(--accent); }}
+  /* Log */
+  #log-section {{ display: none; }}
+  .log-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
+  .log-table th {{ background: var(--surface2); padding: 8px 10px; text-align: left; color: var(--muted); }}
+  .log-table td {{ padding: 7px 10px; border-bottom: 1px solid var(--surface2); }}
+  .log-table tr:hover td {{ background: var(--surface2); }}
+  .status-ok {{ color: #10b981; }} .status-error {{ color: #ef4444; }}
+  .hidden {{ display: none; }}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌐 食品添加剂市场情报</h1>
+  <div class="meta">更新时间：{generated_at} &nbsp;|&nbsp; 数据来源：公开信息</div>
+</header>
+<div class="layout">
+  <aside>
+    <div class="sidebar-section">视图</div>
+    <button class="filter-btn active" onclick="setView('feed')">📰 情报总览</button>
+    <button class="filter-btn" onclick="setView('regulatory')">⚖️ 法规追踪</button>
+    <button class="filter-btn" onclick="setView('charts')">📊 趋势分析</button>
+    <button class="filter-btn" onclick="setView('log')">🔄 采集日志</button>
+
+    <div class="sidebar-section">品类筛选</div>
+    <button class="filter-btn" onclick="filterCat('all')" id="cat-all">全部 <span class="badge" id="badge-all">0</span></button>
+    <button class="filter-btn" onclick="filterCat('sweeteners')" id="cat-sweeteners">🍬 甜味剂 <span class="badge" id="badge-sweeteners">0</span></button>
+    <button class="filter-btn" onclick="filterCat('colorants')" id="cat-colorants">🎨 食用色素 <span class="badge" id="badge-colorants">0</span></button>
+    <button class="filter-btn" onclick="filterCat('flavors')" id="cat-flavors">🌸 食品香料 <span class="badge" id="badge-flavors">0</span></button>
+    <button class="filter-btn" onclick="filterCat('functional_ingredients')" id="cat-functional_ingredients">💊 功能原料 <span class="badge" id="badge-functional_ingredients">0</span></button>
+    <button class="filter-btn" onclick="filterCat('general')" id="cat-general">📋 综合 <span class="badge" id="badge-general">0</span></button>
+
+    <div class="sidebar-section">地区筛选</div>
+    <button class="filter-btn" onclick="filterRegion('all')" id="reg-all">全部</button>
+    <button class="filter-btn" onclick="filterRegion('china')" id="reg-china">🇨🇳 中国</button>
+    <button class="filter-btn" onclick="filterRegion('eu')" id="reg-eu">🇪🇺 欧盟</button>
+    <button class="filter-btn" onclick="filterRegion('usa')" id="reg-usa">🇺🇸 美国</button>
+    <button class="filter-btn" onclick="filterRegion('sea')" id="reg-sea">🌏 东南亚</button>
+    <button class="filter-btn" onclick="filterRegion('mea')" id="reg-mea">🌍 中东/非洲</button>
+    <button class="filter-btn" onclick="filterRegion('global')" id="reg-global">🌐 全球</button>
+
+    <div class="sidebar-section">类型筛选</div>
+    <button class="filter-btn" onclick="filterType('all')" id="type-all">全部</button>
+    <button class="filter-btn" onclick="filterType('news')" id="type-news">📰 行业动态</button>
+    <button class="filter-btn" onclick="filterType('regulatory')" id="type-regulatory">⚖️ 法规监管</button>
+    <button class="filter-btn" onclick="filterType('market')" id="type-market">📈 市场信号</button>
+    <button class="filter-btn" onclick="filterType('competitor')" id="type-competitor">🏢 竞争情报</button>
+  </aside>
+
+  <main id="main-content">
+    <!-- Feed View -->
+    <div id="feed-section">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="section-title">情报列表</div>
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="搜索标题、摘要、来源..." oninput="onSearch()">
+        <select id="sort-select" onchange="renderFeed()">
+          <option value="date">按时间排序</option>
+          <option value="relevance">按相关性排序</option>
+        </select>
+      </div>
+      <div id="feed"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Regulatory View -->
+    <div id="regulatory-section" class="hidden">
+      <div class="section-title">监管法规追踪（最新100条）</div>
+      <div id="regulatory-feed"></div>
+    </div>
+
+    <!-- Charts View -->
+    <div id="charts-section" class="hidden">
+      <div class="section-title">数据统计与趋势</div>
+      <div class="charts-row">
+        <div class="chart-card"><h3>品类分布（近30天）</h3><canvas id="cat-chart"></canvas></div>
+        <div class="chart-card"><h3>地区分布（近30天）</h3><canvas id="region-chart"></canvas></div>
+        <div class="chart-card"><h3>日发布趋势（近60天）</h3><canvas id="trend-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Log View -->
+    <div id="log-section" class="hidden">
+      <div class="section-title">数据采集日志</div>
+      <table class="log-table">
+        <thead><tr><th>数据源</th><th>采集时间</th><th>发现条数</th><th>新增条数</th><th>状态</th></tr></thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+const ALL_DATA = {recent_json};
+const CAT_COUNTS = {cat_json};
+const REGION_COUNTS = {region_json};
+const REGULATORY = {regulatory_json};
+const TREND = {trend_json};
+const FETCH_LOG = {fetch_log_json};
+
+const CAT_LABELS = {{sweeteners:'甜味剂',colorants:'食用色素',flavors:'食品香料',functional_ingredients:'功能新食品原料',general:'综合'}};
+const REGION_LABELS = {{china:'🇨🇳 中国',eu:'🇪🇺 欧盟',usa:'🇺🇸 美国',sea:'🌏 东南亚',mea:'🌍 中东/非洲',global:'🌐 全球'}};
+const TYPE_LABELS = {{news:'行业动态',regulatory:'法规监管',market:'市场信号',competitor:'竞争情报'}};
+const CAT_COLORS = {{sweeteners:'#a78bfa',colorants:'#f472b6',flavors:'#34d399',functional_ingredients:'#fb923c',general:'#60a5fa'}};
+const REGION_COLORS = {{china:'#f87171',eu:'#60a5fa',usa:'#34d399',sea:'#fbbf24',mea:'#a78bfa',global:'#94a3b8'}};
+
+let currentCat = 'all', currentRegion = 'all', currentType = 'all';
+let searchTerm = '', currentPage = 1;
+const PAGE_SIZE = 25;
+let chartsInit = false;
+
+function setView(view) {{
+  ['feed','regulatory','charts','log'].forEach(v => {{
+    document.getElementById(v+'-section').classList.toggle('hidden', v !== view);
+  }});
+  document.querySelectorAll('aside .filter-btn').forEach(b => {{
+    if(b.getAttribute('onclick') === `setView('${{view}}')`) b.classList.add('active');
+    else if(b.getAttribute('onclick') && b.getAttribute('onclick').startsWith('setView')) b.classList.remove('active');
+  }});
+  if(view === 'charts' && !chartsInit) {{ initCharts(); chartsInit = true; }}
+  if(view === 'regulatory') renderRegulatory();
+  if(view === 'log') renderLog();
+}}
+
+function filterCat(cat) {{
+  currentCat = cat; currentPage = 1;
+  document.querySelectorAll('[id^="cat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('cat-'+cat)?.classList.add('active');
+  renderFeed();
+}}
+function filterRegion(region) {{
+  currentRegion = region; currentPage = 1;
+  document.querySelectorAll('[id^="reg-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('reg-'+region)?.classList.add('active');
+  renderFeed();
+}}
+function filterType(type) {{
+  currentType = type; currentPage = 1;
+  document.querySelectorAll('[id^="type-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-'+type)?.classList.add('active');
+  renderFeed();
+}}
+function onSearch() {{
+  searchTerm = document.getElementById('search-input').value.toLowerCase();
+  currentPage = 1;
+  renderFeed();
+}}
+
+function getFiltered() {{
+  return ALL_DATA.filter(item => {{
+    if(currentCat !== 'all' && item.category !== currentCat) return false;
+    if(currentRegion !== 'all' && item.region !== currentRegion) return false;
+    if(currentType !== 'all' && item.item_type !== currentType) return false;
+    if(searchTerm && !`${{item.title}} ${{item.summary}} ${{item.source}}`.toLowerCase().includes(searchTerm)) return false;
+    return true;
+  }});
+}}
+
+function renderFeed() {{
+  const sortBy = document.getElementById('sort-select').value;
+  let items = getFiltered();
+  if(sortBy === 'relevance') items.sort((a,b) => b.relevance - a.relevance);
+  else items.sort((a,b) => (b.published_at||'').localeCompare(a.published_at||''));
+
+  const total = items.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const pageItems = items.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
+  const feed = document.getElementById('feed');
+  feed.innerHTML = pageItems.map(item => {{
+    const typeColor = {{news:'#3b82f6',regulatory:'#ef4444',market:'#10b981',competitor:'#f59e0b'}}[item.item_type] || '#94a3b8';
+    const relevanceColor = item.relevance > 0.6 ? '#10b981' : item.relevance > 0.3 ? '#f59e0b' : '#475569';
+    const date = item.published_at ? item.published_at.slice(0,10) : '';
+    const typeLabel = TYPE_LABELS[item.item_type] || item.item_type;
+    const catLabel = CAT_LABELS[item.category] || item.category;
+    const regionLabel = REGION_LABELS[item.region] || item.region;
+    return `<div class="feed-item" style="border-left-color:${{typeColor}}">
+      <div class="item-header">
+        <div class="relevance-dot" style="background:${{relevanceColor}}" title="相关性: ${{Math.round(item.relevance*100)}}%"></div>
+        <h4><a href="${{item.url || '#'}}" target="_blank" rel="noopener">${{item.title || '(无标题)'}}</a></h4>
+      </div>
+      <div class="summary">${{item.summary || ''}}</div>
+      <div class="meta">
+        <span class="tag tag-type-${{item.item_type}}">${{typeLabel}}</span>
+        <span class="tag tag-cat">${{catLabel}}</span>
+        <span class="tag tag-region">${{regionLabel}}</span>
+        <span class="item-source">${{item.source || ''}}</span>
+        <span class="item-date">${{date}}</span>
+      </div>
+    </div>`;
+  }}).join('');
+
+  // Pagination
+  const pag = document.getElementById('pagination');
+  if(pages <= 1) {{ pag.innerHTML = ''; return; }}
+  let html = '';
+  const start = Math.max(1, currentPage-2), end = Math.min(pages, currentPage+2);
+  if(start > 1) html += `<button class="page-btn" onclick="goPage(1)">1</button>`;
+  if(start > 2) html += `<span style="color:var(--muted);padding:6px">…</span>`;
+  for(let i=start;i<=end;i++) html += `<button class="page-btn${{i===currentPage?' active':''}}" onclick="goPage(${{i}})">${{i}}</button>`;
+  if(end < pages-1) html += `<span style="color:var(--muted);padding:6px">…</span>`;
+  if(end < pages) html += `<button class="page-btn" onclick="goPage(${{pages}})">${{pages}}</button>`;
+  pag.innerHTML = html;
+}}
+
+function goPage(p) {{ currentPage = p; renderFeed(); window.scrollTo(0,0); }}
+
+function renderStats() {{
+  const counts = {{}};
+  ALL_DATA.forEach(item => {{
+    counts[item.category] = (counts[item.category]||0)+1;
+    counts['all'] = (counts['all']||0)+1;
+  }});
+  Object.keys(counts).forEach(k => {{
+    const el = document.getElementById('badge-'+k);
+    if(el) el.textContent = counts[k];
+  }});
+
+  const statsEl = document.getElementById('stats-grid');
+  const total30 = ALL_DATA.filter(i => i.published_at && i.published_at >= new Date(Date.now()-30*864e5).toISOString()).length;
+  const regCount = ALL_DATA.filter(i => i.item_type==='regulatory').length;
+  const highRel = ALL_DATA.filter(i => i.relevance >= 0.5).length;
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="num">${{ALL_DATA.length}}</div><div class="label">情报总条数</div></div>
+    <div class="stat-card"><div class="num">${{total30}}</div><div class="label">近30天新增</div></div>
+    <div class="stat-card"><div class="num">${{regCount}}</div><div class="label">法规情报</div></div>
+    <div class="stat-card"><div class="num">${{highRel}}</div><div class="label">高相关度</div></div>
+  `;
+}}
+
+function renderRegulatory() {{
+  const feed = document.getElementById('regulatory-feed');
+  feed.innerHTML = REGULATORY.map(item => {{
+    const date = item.published_at ? item.published_at.slice(0,10) : '';
+    const catLabel = CAT_LABELS[item.category] || item.category;
+    const regionLabel = REGION_LABELS[item.region] || item.region;
+    return `<div class="feed-item" style="border-left-color:#ef4444">
+      <div class="item-header">
+        <h4><a href="${{item.url || '#'}}" target="_blank" rel="noopener">${{item.title || '(无标题)'}}</a></h4>
+      </div>
+      <div class="summary">${{item.summary || ''}}</div>
+      <div class="meta">
+        <span class="tag tag-type-regulatory">法规监管</span>
+        <span class="tag tag-cat">${{catLabel}}</span>
+        <span class="tag tag-region">${{regionLabel}}</span>
+        <span class="item-source">${{item.source || ''}}</span>
+        <span class="item-date">${{date}}</span>
+      </div>
+    </div>`;
+  }}).join('') || '<div style="color:var(--muted);padding:20px">暂无法规情报</div>';
+}}
+
+function renderLog() {{
+  const tbody = document.getElementById('log-body');
+  tbody.innerHTML = FETCH_LOG.map(row => `<tr>
+    <td>${{row.source_name}}</td>
+    <td style="color:var(--muted)">${{row.fetched_at||''}}</td>
+    <td>${{row.items_found}}</td>
+    <td>${{row.items_new}}</td>
+    <td class="status-${{row.status}}">${{row.status}}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">暂无日志</td></tr>';
+}}
+
+function initCharts() {{
+  // Category chart
+  const catCtx = document.getElementById('cat-chart').getContext('2d');
+  new Chart(catCtx, {{
+    type: 'doughnut',
+    data: {{
+      labels: CAT_COUNTS.map(r => CAT_LABELS[r.category]||r.category),
+      datasets: [{{ data: CAT_COUNTS.map(r => r.cnt),
+        backgroundColor: CAT_COUNTS.map(r => CAT_COLORS[r.category]||'#64748b'),
+        borderWidth: 0 }}]
+    }},
+    options: {{ plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font: {{size:11}} }} }} }}, maintainAspectRatio: false }}
+  }});
+
+  // Region chart
+  const regCtx = document.getElementById('region-chart').getContext('2d');
+  new Chart(regCtx, {{
+    type: 'doughnut',
+    data: {{
+      labels: REGION_COUNTS.map(r => REGION_LABELS[r.region]||r.region),
+      datasets: [{{ data: REGION_COUNTS.map(r => r.cnt),
+        backgroundColor: REGION_COUNTS.map(r => REGION_COLORS[r.region]||'#64748b'),
+        borderWidth: 0 }}]
+    }},
+    options: {{ plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font: {{size:11}} }} }} }}, maintainAspectRatio: false }}
+  }});
+
+  // Trend chart — aggregate daily total
+  const days = [...new Set(TREND.map(r => r.day))].sort();
+  const cats = ['sweeteners','colorants','flavors','functional_ingredients','general'];
+  const catColorMap = CAT_COLORS;
+  const datasets = cats.map(cat => ({{
+    label: CAT_LABELS[cat]||cat,
+    data: days.map(day => {{
+      const row = TREND.find(r => r.day===day && r.category===cat);
+      return row ? row.cnt : 0;
+    }}),
+    borderColor: catColorMap[cat]||'#64748b',
+    backgroundColor: (catColorMap[cat]||'#64748b')+'33',
+    fill: true, tension: 0.3, pointRadius: 0,
+  }}));
+
+  const trendCtx = document.getElementById('trend-chart').getContext('2d');
+  new Chart(trendCtx, {{
+    type: 'line',
+    data: {{ labels: days, datasets }},
+    options: {{
+      maintainAspectRatio: false,
+      scales: {{
+        x: {{ ticks: {{ color: '#64748b', maxTicksLimit: 10, font:{{size:10}} }}, grid: {{ color: '#1e293b' }} }},
+        y: {{ ticks: {{ color: '#64748b', font:{{size:10}} }}, grid: {{ color: '#1e293b' }}, beginAtZero: true }}
+      }},
+      plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font:{{size:11}}, boxWidth:12 }} }} }}
+    }}
+  }});
+}}
+
+// Init
+renderStats();
+renderFeed();
+</script>
+</body>
+</html>"""
+
+
+def build_dashboard(db_path: str, output_path: str):
+    data = query_dashboard_data(db_path)
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    html = _build_html(data, generated_at)
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"[Dashboard] Generated: {output_path} ({len(data['recent'])} items)")
