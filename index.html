@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食品添加剂市场情报看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+    --accent: #38bdf8; --text: #e2e8f0; --muted: #94a3b8;
+    --sweeteners: #a78bfa; --colorants: #f472b6;
+    --flavors: #34d399; --functional_ingredients: #fb923c; --general: #60a5fa;
+    --news: #3b82f6; --regulatory: #ef4444; --market: #10b981; --competitor: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; font-size: 14px; }
+  header { background: var(--surface); border-bottom: 1px solid var(--surface2); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 57px); }
+  aside { background: var(--surface); border-right: 1px solid var(--surface2); padding: 16px 0; }
+  .sidebar-section { padding: 8px 16px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  .filter-btn { display: block; width: 100%; padding: 8px 20px; text-align: left; background: none; border: none; color: var(--text); cursor: pointer; font-size: 13px; border-left: 3px solid transparent; transition: all 0.15s; }
+  .filter-btn:hover { background: var(--surface2); color: var(--accent); }
+  .filter-btn.active { border-left-color: var(--accent); background: rgba(56,189,248,0.08); color: var(--accent); font-weight: 600; }
+  .filter-btn .badge { float: right; background: var(--surface2); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--muted); }
+  main { overflow-y: auto; padding: 20px; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 20px; }
+  .section-title:first-child { margin-top: 0; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border-radius: 8px; padding: 14px 16px; border: 1px solid var(--surface2); }
+  .stat-card .num { font-size: 28px; font-weight: 800; color: var(--accent); }
+  .stat-card .label { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-bottom: 20px; }
+  .chart-card { background: var(--surface); border-radius: 8px; padding: 16px; border: 1px solid var(--surface2); }
+  .chart-card h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .chart-card canvas { max-height: 200px; }
+  .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-bar input { flex: 1; background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar select { background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }
+  #feed { display: flex; flex-direction: column; gap: 8px; }
+  .feed-item { background: var(--surface); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--surface2); border-left: 3px solid var(--news); transition: border-color 0.15s; cursor: pointer; }
+  .feed-item:hover { border-color: var(--accent); }
+  .feed-item .item-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .feed-item h4 { font-size: 14px; font-weight: 600; flex: 1; line-height: 1.4; }
+  .feed-item h4 a { color: var(--text); text-decoration: none; }
+  .feed-item h4 a:hover { color: var(--accent); }
+  .feed-item .summary { color: var(--muted); font-size: 12px; line-height: 1.5; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .feed-item .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .tag-type-news { background: rgba(59,130,246,0.15); color: #93c5fd; }
+  .tag-type-regulatory { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .tag-type-market { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+  .tag-type-competitor { background: rgba(245,158,11,0.15); color: #fcd34d; }
+  .tag-cat { background: rgba(148,163,184,0.1); color: var(--muted); }
+  .tag-region { background: rgba(148,163,184,0.1); color: var(--muted); }
+  .item-date { color: var(--muted); font-size: 11px; }
+  .item-source { color: var(--muted); font-size: 11px; }
+  .relevance-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; }
+  .page-btn { background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 6px 12px; color: var(--text); cursor: pointer; font-size: 13px; }
+  .page-btn.active { background: var(--accent); color: #0f172a; font-weight: 700; border-color: var(--accent); }
+  .page-btn:hover:not(.active) { border-color: var(--accent); }
+  #log-section { display: none; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .log-table th { background: var(--surface2); padding: 8px 10px; text-align: left; color: var(--muted); }
+  .log-table td { padding: 7px 10px; border-bottom: 1px solid var(--surface2); }
+  .log-table tr:hover td { background: var(--surface2); }
+  .status-ok { color: #10b981; } .status-error { color: #ef4444; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌐 食品添加剂市场情报</h1>
+  <div class="meta">更新时间：2026-05-05 09:34 UTC &nbsp;|&nbsp; 数据来源：公开信息</div>
+</header>
+<div class="layout">
+  <aside>
+    <div class="sidebar-section">视图</div>
+    <button class="filter-btn active" onclick="setView('feed')">📰 情报总览</button>
+    <button class="filter-btn" onclick="setView('regulatory')">⚖️ 法规追踪</button>
+    <button class="filter-btn" onclick="setView('charts')">📊 趋势分析</button>
+    <button class="filter-btn" onclick="setView('log')">🔄 采集日志</button>
+    <div class="sidebar-section">品类筛选</div>
+    <button class="filter-btn" onclick="filterCat('all')" id="cat-all">全部 <span class="badge" id="badge-all">0</span></button>
+    <button class="filter-btn" onclick="filterCat('sweeteners')" id="cat-sweeteners">🍬 甜味剂 <span class="badge" id="badge-sweeteners">0</span></button>
+    <button class="filter-btn" onclick="filterCat('colorants')" id="cat-colorants">🎨 食用色素 <span class="badge" id="badge-colorants">0</span></button>
+    <button class="filter-btn" onclick="filterCat('flavors')" id="cat-flavors">🌸 食品香料 <span class="badge" id="badge-flavors">0</span></button>
+    <button class="filter-btn" onclick="filterCat('functional_ingredients')" id="cat-functional_ingredients">💊 功能原料 <span class="badge" id="badge-functional_ingredients">0</span></button>
+    <button class="filter-btn" onclick="filterCat('general')" id="cat-general">📋 综合 <span class="badge" id="badge-general">0</span></button>
+    <div class="sidebar-section">地区筛选</div>
+    <button class="filter-btn" onclick="filterRegion('all')" id="reg-all">全部</button>
+    <button class="filter-btn" onclick="filterRegion('china')" id="reg-china">🇨🇳 中国</button>
+    <button class="filter-btn" onclick="filterRegion('eu')" id="reg-eu">🇪🇺 欧盟</button>
+    <button class="filter-btn" onclick="filterRegion('usa')" id="reg-usa">🇺🇸 美国</button>
+    <button class="filter-btn" onclick="filterRegion('sea')" id="reg-sea">🌏 东南亚</button>
+    <button class="filter-btn" onclick="filterRegion('mea')" id="reg-mea">🌍 中东/非洲</button>
+    <button class="filter-btn" onclick="filterRegion('global')" id="reg-global">🌐 全球</button>
+    <div class="sidebar-section">类型筛选</div>
+    <button class="filter-btn" onclick="filterType('all')" id="type-all">全部</button>
+    <button class="filter-btn" onclick="filterType('news')" id="type-news">📰 行业动态</button>
+    <button class="filter-btn" onclick="filterType('regulatory')" id="type-regulatory">⚖️ 法规监管</button>
+    <button class="filter-btn" onclick="filterType('market')" id="type-market">📈 市场信号</button>
+    <button class="filter-btn" onclick="filterType('competitor')" id="type-competitor">🏢 竞争情报</button>
+  </aside>
+  <main id="main-content">
+    <div id="feed-section">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="section-title">情报列表</div>
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="搜索标题、摘要、来源..." oninput="onSearch()">
+        <select id="sort-select" onchange="renderFeed()">
+          <option value="date">按时间排序</option>
+          <option value="relevance">按相关性排序</option>
+        </select>
+      </div>
+      <div id="feed"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+    <div id="regulatory-section" class="hidden">
+      <div class="section-title">监管法规追踪（最新100条）</div>
+      <div id="regulatory-feed"></div>
+    </div>
+    <div id="charts-section" class="hidden">
+      <div class="section-title">数据统计与趋势</div>
+      <div class="charts-row">
+        <div class="chart-card"><h3>品类分布（近30天）</h3><canvas id="cat-chart"></canvas></div>
+        <div class="chart-card"><h3>地区分布（近30天）</h3><canvas id="region-chart"></canvas></div>
+        <div class="chart-card"><h3>日发布趋势（近60天）</h3><canvas id="trend-chart"></canvas></div>
+      </div>
+    </div>
+    <div id="log-section" class="hidden">
+      <div class="section-title">数据采集日志</div>
+      <table class="log-table">
+        <thead><tr><th>数据源</th><th>采集时间</th><th>发现条数</th><th>新增条数</th><th>状态</th></tr></thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<script>
+const ALL_DATA = [{"id": 30, "title": "食品添加剂行业2025年展望：天然化、功能化、国际标准协调", "summary": "行业分析显示，2025年中国食品添加剂市场将延续三大趋势：天然来源原料加速替代合成产品、功能性配料价值重估、以及与国际标准（CODEX、EFSA）的协调进程加快。", "url": "https://example.com/china-food-additives-outlook-2025", "source": "食品工业协会", "region": "china", "category": "general", "item_type": "news", "language": "zh", "published_at": "2026-05-04T21:27:17.688930+00:00", "relevance": 0.43}, {"id": 31, "title": "Smoke Flavor Alternatives Gain Ground as Traditional Methods Face Restrictions", "summary": "Market intelligence update: smoke flavor alternatives gain ground as traditional methods face restrictions.", "url": "https://example.com/article-0", "source": "中国卫健委", "region": "mea", "category": "flavors", "item_type": "regulatory", "language": "en", "published_at": "2026-05-04T08:27:17.688930+00:00", "relevance": 0.455}, {"id": 7, "title": "赤藓糖醇价格跌至三年新低，行业产能过剩加剧", "summary": "受国内多家企业大规模扩产影响，赤藓糖醇现货价格跌破18000元/吨，较高峰期下降超过60%。分析人士预计产能出清需要12-18个月。", "url": "https://example.com/erythritol-price-drop", "source": "中国食品报", "region": "china", "category": "sweeteners", "item_type": "market", "language": "zh", "published_at": "2026-05-01T06:27:17.688930+00:00", "relevance": 0.932}, {"id": 11, "title": "FDA Approves Butterfly Pea Flower Extract as Provisional Color Additive", "summary": "The U.S. FDA has approved butterfly pea flower (Clitoria ternatea) extract as a provisional color additive for use in alcoholic beverages, sports drinks, and ready-to-drink teas.", "url": "https://example.com/fda-butterfly-pea-approval", "source": "FDA", "region": "usa", "category": "colorants", "item_type": "regulatory", "language": "en", "published_at": "2026-05-01T21:27:17.688930+00:00", "relevance": 0.668}, {"id": 27, "title": "Lonza Acquires Probiotic Strain Library from Swiss Research Institute", "summary": "Swiss life science company Lonza acquired an extensive probiotic strain library from ETH Zurich, expanding its portfolio of documented health-benefit strains for use in functional food applications globally.", "url": "https://example.com/lonza-probiotic-acquisition", "source": "Nutraingredients", "region": "global", "category": "functional_ingredients", "item_type": "competitor", "language": "en", "published_at": "2026-04-30T14:27:17.688930+00:00", "relevance": 0.645}, {"id": 6, "title": "Saudi Arabia SFDA Updates Permitted Sweetener List — Allulose Now Approved", "summary": "The Saudi Food and Drug Authority has expanded its list of approved sweeteners to include allulose and certain novel steviol glycosides, effective from Q3 2025, aligning with international Codex standards.", "url": "https://example.com/sfda-sweetener-approval", "source": "SFDA", "region": "mea", "category": "sweeteners", "item_type": "regulatory", "language": "en", "published_at": "2026-04-27T00:27:17.688930+00:00", "relevance": 0.541}, {"id": 8, "title": "Thailand FDA Approves Stevia as Food Additive — New Opportunities for Exporters", "summary": "Thailand's Food and Drug Administration officially listed stevia leaf extract as a permitted food additive in sweetened beverages and dairy products, following months of review under the ASEAN harmonization framework.", "url": "https://example.com/thailand-fda-stevia", "source": "FoodNavigator Asia", "region": "sea", "category": "sweeteners", "item_type": "regulatory", "language": "en", "published_at": "2026-04-26T13:27:17.688930+00:00", "relevance": 0.861}, {"id": 2, "title": "EFSA Publishes Safety Assessment on Steviol Glycosides — New Forms Approved", "summary": "EFSA's Panel on Food Additives released a positive safety opinion on several new steviol glycoside forms including Reb M and Reb D, paving the way for wider use across the EU as a natural sweetener.", "url": "https://example.com/efsa-stevia-rebm", "source": "EFSA", "region": "eu", "category": "sweeteners", "item_type": "regulatory", "language": "en", "published_at": "2026-04-25T18:27:17.688930+00:00", "relevance": 0.633}, {"id": 5, "title": "Tate & Lyle Expands Allulose Production Capacity in Singapore", "summary": "Tate & Lyle announced a $120 million investment to expand its rare sugar production capacity in Singapore, targeting the Asia-Pacific market where demand for low-calorie sweeteners is growing rapidly.", "url": "https://example.com/tate-lyle-singapore-allulose", "source": "Food Ingredients First", "region": "sea", "category": "sweeteners", "item_type": "competitor", "language": "en", "published_at": "2026-04-14T17:27:17.688930+00:00", "relevance": 0.412}, {"id": 9, "title": "EU to Phase Out Titanium Dioxide (E171) in Food by 2025", "summary": "Following EFSA's ruling that titanium dioxide can no longer be considered safe as a food additive, the European Commission has confirmed a phase-out timeline.", "url": "https://example.com/eu-e171-ban", "source": "EFSA", "region": "eu", "category": "colorants", "item_type": "regulatory", "language": "en", "published_at": "2026-04-12T04:27:17.688930+00:00", "relevance": 0.596}, {"id": 3, "title": "China Amends GB 2760: New Limits on Acesulfame-K and Aspartame in Beverages", "summary": "国家卫生健康委员会发布公告，修订GB 2760食品添加剂使用标准，调整安赛蜜和阿斯巴甜在饮料中的最大使用量，同时新增赤藓糖醇在多类食品中的使用规定。", "url": "https://example.com/gb2760-sweetener-amendment", "source": "国家卫生健康委员会", "region": "china", "category": "sweeteners", "item_type": "regulatory", "language": "zh", "published_at": "2026-04-12T12:27:17.688930+00:00", "relevance": 0.858}, {"id": 4, "title": "Erythritol Global Market Expected to Reach $1.2B by 2028", "summary": "The global erythritol market is projected to grow at a CAGR of 7.8% from 2023 to 2028, driven by strong demand from beverage and confectionery sectors.", "url": "https://example.com/erythritol-market-2028", "source": "Grand View Research", "region": "global", "category": "sweeteners", "item_type": "market", "language": "en", "published_at": "2026-03-28T22:27:17.688930+00:00", "relevance": 0.806}, {"id": 10, "title": "Natural Colorant Market Surges as Clean Label Demand Grows", "summary": "The global natural food colorants market reached $2.4 billion in 2024, growing at 8.2% annually. Beta-carotene, anthocyanins, and curcumin are the fastest-growing segments.", "url": "https://example.com/natural-colorant-market-2024", "source": "Mordor Intelligence", "region": "global", "category": "colorants", "item_type": "market", "language": "en", "published_at": "2026-03-27T04:27:17.688930+00:00", "relevance": 0.59}, {"id": 13, "title": "GNT Group Acquires Specialty Spirulina Producer to Secure Blue Colorant Supply", "summary": "Natural colorant specialist GNT Group completed the acquisition of a spirulina cultivation company to secure supply of phycocyanin, as demand for blue natural colors outpaces supply globally.", "url": "https://example.com/gnt-spirulina-acquisition", "source": "Food Ingredients First", "region": "global", "category": "colorants", "item_type": "competitor", "language": "en", "published_at": "2026-04-10T22:27:17.688930+00:00", "relevance": 0.486}, {"id": 14, "title": "UAE ESMA Issues New Standards for Synthetic Food Dyes — Reduced Limits", "summary": "The Emirates Authority for Standardization and Metrology (ESMA) published updated technical regulations reducing maximum permitted levels for sunset yellow, tartrazine, and brilliant blue in food products.", "url": "https://example.com/uae-esma-dye-limits", "source": "ESMA", "region": "mea", "category": "colorants", "item_type": "regulatory", "language": "en", "published_at": "2026-04-21T21:27:17.688930+00:00", "relevance": 0.456}, {"id": 12, "title": "中国天然色素行业协会：花青素提取物需求年增25%", "summary": "随着消费者对天然配料的偏好提升，国内花青素市场需求显著增长，主要应用于饮料、乳制品及功能性食品。", "url": "https://example.com/china-anthocyanin-demand", "source": "中国食品添加剂协会", "region": "china", "category": "colorants", "item_type": "market", "language": "zh", "published_at": "2026-03-30T13:27:17.688930+00:00", "relevance": 0.592}, {"id": 15, "title": "FEMA Publishes 31st GRAS List — 56 New Flavor Ingredients Added", "summary": "The Flavor and Extract Manufacturers Association released its 31st list of flavor ingredients that are Generally Recognized As Safe (GRAS), adding 56 new substances following independent expert review.", "url": "https://example.com/fema-gras-31st", "source": "FEMA", "region": "usa", "category": "flavors", "item_type": "regulatory", "language": "en", "published_at": "2026-04-10T10:27:17.688930+00:00", "relevance": 0.628}, {"id": 16, "title": "Global Flavor & Fragrance Market Projected to Hit $40B by 2030", "summary": "The global flavor and fragrance market is forecast to exceed $40 billion by 2030. Asia-Pacific is the fastest-growing region, with savory and umami flavors seeing the highest growth rates.", "url": "https://example.com/ff-market-2030", "source": "MarketsandMarkets", "region": "global", "category": "flavors", "item_type": "market", "language": "en", "published_at": "2026-04-11T19:27:17.688930+00:00", "relevance": 0.707}, {"id": 17, "title": "IFF and Givaudan Battle for Market Share in Chinese Flavor Market", "summary": "IFF and Givaudan are both expanding their local R&D and application centers in Shanghai and Guangzhou as China's processed food market drives demand for customized flavor solutions.", "url": "https://example.com/iff-givaudan-china", "source": "FoodNavigator Asia", "region": "china", "category": "flavors", "item_type": "competitor", "language": "en", "published_at": "2026-04-05T12:27:17.688930+00:00", "relevance": 0.506}, {"id": 18, "title": "欧盟修订食品香料法规 — 新增17种允许使用的天然香料物质", "summary": "欧盟委员会发布实施条例，对食品香料正面清单进行修订，新增17种来源于天然提取物的香料物质，同时对5种合成香料的使用量设置了更严格的限制。", "url": "https://example.com/eu-flavor-regulation-update", "source": "European Commission", "region": "eu", "category": "flavors", "item_type": "regulatory", "language": "zh", "published_at": "2026-03-26T17:27:17.688930+00:00", "relevance": 0.459}, {"id": 19, "title": "Vanilla Supply Chain Disruption Pushes Prices Up 40% in Southeast Asia", "summary": "Cyclone damage to Madagascar's vanilla crop caused natural vanilla prices to spike across Southeast Asian markets, prompting manufacturers to accelerate reformulation with synthetic alternatives.", "url": "https://example.com/vanilla-supply-crisis-sea", "source": "Food Business News", "region": "sea", "category": "flavors", "item_type": "market", "language": "en", "published_at": "2026-04-26T00:27:17.688930+00:00", "relevance": 0.541}, {"id": 20, "title": "Halal Flavor Certification Requirements Tighten in Gulf Cooperation Council Markets", "summary": "GCC countries have unified Halal certification standards for flavor ingredients, requiring full traceability documentation for all animal-derived flavor carriers and solvents.", "url": "https://example.com/gcc-halal-flavor", "source": "GSO", "region": "mea", "category": "flavors", "item_type": "regulatory", "language": "en", "published_at": "2026-04-08T05:27:17.688930+00:00", "relevance": 0.78}, {"id": 21, "title": "China NHSA Approves Hyaluronic Acid (Sodium Hyaluronate) as Novel Food Ingredient", "summary": "国家卫生健康委员会正式批准透明质酸钠（玻尿酸）作为新食品原料，可用于普通食品中，适用人群为18岁以上成年人，推荐每日摄入量不超过200mg。", "url": "https://example.com/nhsa-hyaluronic-acid-approval", "source": "国家卫生健康委员会", "region": "china", "category": "functional_ingredients", "item_type": "regulatory", "language": "zh", "published_at": "2026-03-30T06:27:17.688930+00:00", "relevance": 0.538}, {"id": 22, "title": "EU Novel Food Regulation Update: Lab-Grown Collagen and Fermented Protein Ingredients", "summary": "The European Commission has received novel food applications for lab-grown collagen peptides and precision-fermented whey protein alternatives, with assessments expected to complete within 18 months.", "url": "https://example.com/eu-novel-food-collagen", "source": "European Commission", "region": "eu", "category": "functional_ingredients", "item_type": "regulatory", "language": "en", "published_at": "2026-04-03T06:27:17.688930+00:00", "relevance": 0.705}, {"id": 23, "title": "Functional Ingredients Market in ASEAN to Grow 12% CAGR Through 2028", "summary": "Southeast Asia's functional food ingredients market is expanding rapidly, with probiotic strains, plant proteins, and adaptogenic botanicals leading growth.", "url": "https://example.com/asean-functional-ingredients", "source": "Nutraingredients Asia", "region": "sea", "category": "functional_ingredients", "item_type": "market", "language": "en", "published_at": "2026-03-25T22:27:17.688930+00:00", "relevance": 0.63}, {"id": 24, "title": "FDA Sends Warning Letters Over NMN Marketing Claims", "summary": "The FDA issued warning letters to multiple dietary supplement companies marketing NMN products for age-reversal or disease prevention claims.", "url": "https://example.com/fda-nmn-warning", "source": "FDA", "region": "usa", "category": "functional_ingredients", "item_type": "regulatory", "language": "en", "published_at": "2026-03-22T10:27:17.688930+00:00", "relevance": 0.782}, {"id": 25, "title": "中国植物提取物出口额创历史新高，姜黄素、葡萄籽提取物需求旺盛", "summary": "2024年中国植物提取物出口总额达58亿美元，同比增长18%。其中姜黄素、葡萄籽提取物、枸杞多糖对欧美市场出口增速最快。", "url": "https://example.com/china-botanical-export-2024", "source": "中国医保商会", "region": "china", "category": "functional_ingredients", "item_type": "market", "language": "zh", "published_at": "2026-04-12T00:27:17.688930+00:00", "relevance": 0.708}, {"id": 26, "title": "Nigeria NAFDAC Issues Guidelines for Functional Food Ingredients Registration", "summary": "Nigeria's NAFDAC published new registration guidelines for functional food ingredients, requiring clinical evidence for health claims and GMP certificates from manufacturing facilities.", "url": "https://example.com/nafdac-functional-food-guidelines", "source": "NAFDAC", "region": "mea", "category": "functional_ingredients", "item_type": "regulatory", "language": "en", "published_at": "2026-03-26T02:27:17.688930+00:00", "relevance": 0.409}, {"id": 28, "title": "Codex Alimentarius Commission Adopts New Principles on Food Additives Safety", "summary": "The 46th session of the Codex Alimentarius Commission adopted updated principles for the assessment and management of food additive safety, incorporating new guidance on cumulative exposure.", "url": "https://example.com/codex-food-additives-principles", "source": "FAO/WHO Codex", "region": "global", "category": "general", "item_type": "regulatory", "language": "en", "published_at": "2026-04-11T06:27:17.688930+00:00", "relevance": 0.935}, {"id": 29, "title": "IFT 2025 Conference: Key Themes Around Precision Fermentation and AI-Driven Formulation", "summary": "The IFT annual conference highlighted precision fermentation, AI-assisted formulation, and sustainable sourcing as dominant trends reshaping the food ingredients industry in 2025.", "url": "https://example.com/ift-2025-conference", "source": "IFT", "region": "usa", "category": "general", "item_type": "news", "language": "en", "published_at": "2026-04-13T03:27:17.688930+00:00", "relevance": 0.708}, {"id": 30, "title": "食品添加剂行业2025年展望：天然化、功能化、国际标准协调（深度分析）", "summary": "行业分析显示，2025年中国食品添加剂市场将延续三大趋势：天然来源原料加速替代合成产品、功能性配料价值重估、以及与国际标准的协调进程加快。", "url": "https://example.com/china-food-additives-outlook-2025-2", "source": "食品工业协会", "region": "china", "category": "general", "item_type": "news", "language": "zh", "published_at": "2026-04-20T12:00:00+00:00", "relevance": 0.72}];
+const CAT_COUNTS = [{"category": "sweeteners", "cnt": 10}, {"category": "colorants", "cnt": 7}, {"category": "flavors", "cnt": 7}, {"category": "functional_ingredients", "cnt": 8}, {"category": "general", "cnt": 4}];
+const REGION_COUNTS = [{"region": "global", "cnt": 6}, {"region": "china", "cnt": 7}, {"region": "mea", "cnt": 5}, {"region": "sea", "cnt": 4}, {"region": "usa", "cnt": 5}, {"region": "eu", "cnt": 5}];
+const REGULATORY = [{"id": 3, "title": "China Amends GB 2760: New Limits on Acesulfame-K and Aspartame in Beverages", "summary": "国家卫生健康委员会发布公告，修订GB 2760食品添加剂使用标准。", "url": "https://example.com/gb2760-sweetener-amendment", "source": "国家卫生健康委员会", "region": "china", "category": "sweeteners", "published_at": "2026-04-12T12:27:17+00:00"}, {"id": 2, "title": "EFSA Publishes Safety Assessment on Steviol Glycosides — New Forms Approved", "summary": "EFSA's Panel on Food Additives released a positive safety opinion on Reb M and Reb D steviol glycosides.", "url": "https://example.com/efsa-stevia-rebm", "source": "EFSA", "region": "eu", "category": "sweeteners", "published_at": "2026-04-25T18:27:17+00:00"}, {"id": 6, "title": "Saudi Arabia SFDA Updates Permitted Sweetener List — Allulose Now Approved", "summary": "The Saudi Food and Drug Authority expanded its approved sweetener list to include allulose.", "url": "https://example.com/sfda-sweetener-approval", "source": "SFDA", "region": "mea", "category": "sweeteners", "published_at": "2026-04-27T00:27:17+00:00"}, {"id": 8, "title": "Thailand FDA Approves Stevia as Food Additive", "summary": "Thailand officially listed stevia leaf extract as a permitted food additive under the ASEAN harmonization framework.", "url": "https://example.com/thailand-fda-stevia", "source": "Thai FDA", "region": "sea", "category": "sweeteners", "published_at": "2026-04-26T13:27:17+00:00"}, {"id": 9, "title": "EU to Phase Out Titanium Dioxide (E171) in Food", "summary": "The European Commission confirmed a phase-out timeline for titanium dioxide following EFSA's safety ruling.", "url": "https://example.com/eu-e171-ban", "source": "EFSA", "region": "eu", "category": "colorants", "published_at": "2026-04-12T04:27:17+00:00"}, {"id": 11, "title": "FDA Approves Butterfly Pea Flower Extract as Provisional Color Additive", "summary": "The U.S. FDA has approved butterfly pea flower extract as a provisional color additive for beverages.", "url": "https://example.com/fda-butterfly-pea-approval", "source": "FDA", "region": "usa", "category": "colorants", "published_at": "2026-05-01T21:27:17+00:00"}, {"id": 14, "title": "UAE ESMA Issues New Standards for Synthetic Food Dyes — Reduced Limits", "summary": "ESMA published updated regulations reducing maximum permitted levels for sunset yellow and brilliant blue.", "url": "https://example.com/uae-esma-dye-limits", "source": "ESMA", "region": "mea", "category": "colorants", "published_at": "2026-04-21T21:27:17+00:00"}, {"id": 15, "title": "FEMA Publishes 31st GRAS List — 56 New Flavor Ingredients Added", "summary": "FEMA released its 31st GRAS list, adding 56 new flavor substances following independent expert review.", "url": "https://example.com/fema-gras-31st", "source": "FEMA", "region": "usa", "category": "flavors", "published_at": "2026-04-10T10:27:17+00:00"}, {"id": 18, "title": "欧盟修订食品香料法规 — 新增17种天然香料物质", "summary": "欧盟委员会对食品香料正面清单进行修订，新增17种天然提取物香料物质。", "url": "https://example.com/eu-flavor-regulation-update", "source": "European Commission", "region": "eu", "category": "flavors", "published_at": "2026-03-26T17:27:17+00:00"}, {"id": 20, "title": "Halal Flavor Certification Requirements Tighten in GCC Markets", "summary": "GCC countries unified Halal certification standards for flavor ingredients with full traceability requirements.", "url": "https://example.com/gcc-halal-flavor", "source": "GSO", "region": "mea", "category": "flavors", "published_at": "2026-04-08T05:27:17+00:00"}, {"id": 21, "title": "China NHSA Approves Hyaluronic Acid as Novel Food Ingredient", "summary": "国家卫生健康委员会正式批准透明质酸钠作为新食品原料，推荐每日摄入量不超过200mg。", "url": "https://example.com/nhsa-hyaluronic-acid-approval", "source": "国家卫生健康委员会", "region": "china", "category": "functional_ingredients", "published_at": "2026-03-30T06:27:17+00:00"}, {"id": 22, "title": "EU Novel Food Regulation Update: Lab-Grown Collagen", "summary": "The European Commission received novel food applications for lab-grown collagen peptides and precision-fermented proteins.", "url": "https://example.com/eu-novel-food-collagen", "source": "European Commission", "region": "eu", "category": "functional_ingredients", "published_at": "2026-04-03T06:27:17+00:00"}, {"id": 24, "title": "FDA Sends Warning Letters Over NMN Marketing Claims", "summary": "The FDA issued warning letters to companies marketing NMN products for age-reversal claims.", "url": "https://example.com/fda-nmn-warning", "source": "FDA", "region": "usa", "category": "functional_ingredients", "published_at": "2026-03-22T10:27:17+00:00"}, {"id": 26, "title": "Nigeria NAFDAC Issues Guidelines for Functional Food Ingredients", "summary": "NAFDAC published new registration guidelines for functional food ingredients requiring clinical evidence.", "url": "https://example.com/nafdac-functional-food-guidelines", "source": "NAFDAC", "region": "mea", "category": "functional_ingredients", "published_at": "2026-03-26T02:27:17+00:00"}, {"id": 28, "title": "Codex Alimentarius Commission Adopts New Food Additives Safety Principles", "summary": "The 46th Codex session adopted updated principles for food additive safety assessment.", "url": "https://example.com/codex-food-additives-principles", "source": "FAO/WHO Codex", "region": "global", "category": "general", "published_at": "2026-04-11T06:27:17+00:00"}, {"id": 1, "title": "FDA Grants GRAS Status to New High-Purity Allulose Process", "summary": "The FDA affirmed GRAS status for a novel enzymatic production process for allulose.", "url": "https://example.com/fda-allulose-gras", "source": "Food Business News", "region": "usa", "category": "sweeteners", "published_at": "2026-04-22T18:27:17+00:00"}];
+const TREND = [{"day": "2026-03-22", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-03-25", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-03-26", "category": "flavors", "cnt": 1}, {"day": "2026-03-26", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-03-27", "category": "colorants", "cnt": 1}, {"day": "2026-03-28", "category": "sweeteners", "cnt": 1}, {"day": "2026-03-30", "category": "colorants", "cnt": 1}, {"day": "2026-03-30", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-04-03", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-04-04", "category": "general", "cnt": 1}, {"day": "2026-04-05", "category": "flavors", "cnt": 1}, {"day": "2026-04-08", "category": "flavors", "cnt": 2}, {"day": "2026-04-10", "category": "colorants", "cnt": 1}, {"day": "2026-04-10", "category": "flavors", "cnt": 1}, {"day": "2026-04-11", "category": "flavors", "cnt": 1}, {"day": "2026-04-11", "category": "general", "cnt": 1}, {"day": "2026-04-12", "category": "colorants", "cnt": 1}, {"day": "2026-04-12", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-04-12", "category": "sweeteners", "cnt": 1}, {"day": "2026-04-13", "category": "general", "cnt": 1}, {"day": "2026-04-14", "category": "sweeteners", "cnt": 1}, {"day": "2026-04-20", "category": "general", "cnt": 1}, {"day": "2026-04-21", "category": "colorants", "cnt": 1}, {"day": "2026-04-22", "category": "sweeteners", "cnt": 2}, {"day": "2026-04-25", "category": "sweeteners", "cnt": 1}, {"day": "2026-04-26", "category": "flavors", "cnt": 1}, {"day": "2026-04-26", "category": "sweeteners", "cnt": 1}, {"day": "2026-04-27", "category": "sweeteners", "cnt": 1}, {"day": "2026-04-30", "category": "functional_ingredients", "cnt": 1}, {"day": "2026-05-01", "category": "colorants", "cnt": 1}, {"day": "2026-05-01", "category": "sweeteners", "cnt": 1}, {"day": "2026-05-04", "category": "flavors", "cnt": 1}, {"day": "2026-05-04", "category": "general", "cnt": 1}];
+const FETCH_LOG = [];
+
+const CAT_LABELS = {sweeteners:'甜味剂',colorants:'食用色素',flavors:'食品香料',functional_ingredients:'功能新食品原料',general:'综合'};
+const REGION_LABELS = {china:'🇨🇳 中国',eu:'🇪🇺 欧盟',usa:'🇺🇸 美国',sea:'🌏 东南亚',mea:'🌍 中东/非洲',global:'🌐 全球'};
+const TYPE_LABELS = {news:'行业动态',regulatory:'法规监管',market:'市场信号',competitor:'竞争情报'};
+const CAT_COLORS = {sweeteners:'#a78bfa',colorants:'#f472b6',flavors:'#34d399',functional_ingredients:'#fb923c',general:'#60a5fa'};
+const REGION_COLORS = {china:'#f87171',eu:'#60a5fa',usa:'#34d399',sea:'#fbbf24',mea:'#a78bfa',global:'#94a3b8'};
+
+let currentCat = 'all', currentRegion = 'all', currentType = 'all';
+let searchTerm = '', currentPage = 1;
+const PAGE_SIZE = 25;
+let chartsInit = false;
+
+function setView(view) {
+  ['feed','regulatory','charts','log'].forEach(v => {
+    document.getElementById(v+'-section').classList.toggle('hidden', v !== view);
+  });
+  document.querySelectorAll('aside .filter-btn').forEach(b => {
+    if(b.getAttribute('onclick') === `setView('${view}')`) b.classList.add('active');
+    else if(b.getAttribute('onclick') && b.getAttribute('onclick').startsWith('setView')) b.classList.remove('active');
+  });
+  if(view === 'charts' && !chartsInit) { initCharts(); chartsInit = true; }
+  if(view === 'regulatory') renderRegulatory();
+  if(view === 'log') renderLog();
+}
+
+function filterCat(cat) {
+  currentCat = cat; currentPage = 1;
+  document.querySelectorAll('[id^="cat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('cat-'+cat)?.classList.add('active');
+  renderFeed();
+}
+function filterRegion(region) {
+  currentRegion = region; currentPage = 1;
+  document.querySelectorAll('[id^="reg-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('reg-'+region)?.classList.add('active');
+  renderFeed();
+}
+function filterType(type) {
+  currentType = type; currentPage = 1;
+  document.querySelectorAll('[id^="type-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-'+type)?.classList.add('active');
+  renderFeed();
+}
+function onSearch() {
+  searchTerm = document.getElementById('search-input').value.toLowerCase();
+  currentPage = 1;
+  renderFeed();
+}
+
+function getFiltered() {
+  return ALL_DATA.filter(item => {
+    if(currentCat !== 'all' && item.category !== currentCat) return false;
+    if(currentRegion !== 'all' && item.region !== currentRegion) return false;
+    if(currentType !== 'all' && item.item_type !== currentType) return false;
+    if(searchTerm && !`${item.title} ${item.summary} ${item.source}`.toLowerCase().includes(searchTerm)) return false;
+    return true;
+  });
+}
+
+function renderFeed() {
+  const sortBy = document.getElementById('sort-select').value;
+  let items = getFiltered();
+  if(sortBy === 'relevance') items.sort((a,b) => b.relevance - a.relevance);
+  else items.sort((a,b) => (b.published_at||'').localeCompare(a.published_at||''));
+  const total = items.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const pageItems = items.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+  const feed = document.getElementById('feed');
+  feed.innerHTML = pageItems.map(item => {
+    const typeColor = {news:'#3b82f6',regulatory:'#ef4444',market:'#10b981',competitor:'#f59e0b'}[item.item_type] || '#94a3b8';
+    const relevanceColor = item.relevance > 0.6 ? '#10b981' : item.relevance > 0.3 ? '#f59e0b' : '#475569';
+    const date = item.published_at ? item.published_at.slice(0,10) : '';
+    const typeLabel = TYPE_LABELS[item.item_type] || item.item_type;
+    const catLabel = CAT_LABELS[item.category] || item.category;
+    const regionLabel = REGION_LABELS[item.region] || item.region;
+    return `<div class="feed-item" style="border-left-color:${typeColor}">
+      <div class="item-header">
+        <div class="relevance-dot" style="background:${relevanceColor}" title="相关性: ${Math.round(item.relevance*100)}%"></div>
+        <h4><a href="${item.url || '#'}" target="_blank" rel="noopener">${item.title || '(无标题)'}</a></h4>
+      </div>
+      <div class="summary">${item.summary || ''}</div>
+      <div class="meta">
+        <span class="tag tag-type-${item.item_type}">${typeLabel}</span>
+        <span class="tag tag-cat">${catLabel}</span>
+        <span class="tag tag-region">${regionLabel}</span>
+        <span class="item-source">${item.source || ''}</span>
+        <span class="item-date">${date}</span>
+      </div>
+    </div>`;
+  }).join('');
+  const pag = document.getElementById('pagination');
+  if(pages <= 1) { pag.innerHTML = ''; return; }
+  let html = '';
+  const start = Math.max(1, currentPage-2), end = Math.min(pages, currentPage+2);
+  if(start > 1) html += `<button class="page-btn" onclick="goPage(1)">1</button>`;
+  if(start > 2) html += `<span style="color:var(--muted);padding:6px">…</span>`;
+  for(let i=start;i<=end;i++) html += `<button class="page-btn${i===currentPage?' active':''}" onclick="goPage(${i})">${i}</button>`;
+  if(end < pages-1) html += `<span style="color:var(--muted);padding:6px">…</span>`;
+  if(end < pages) html += `<button class="page-btn" onclick="goPage(${pages})">${pages}</button>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; renderFeed(); window.scrollTo(0,0); }
+
+function renderStats() {
+  const counts = {};
+  ALL_DATA.forEach(item => {
+    counts[item.category] = (counts[item.category]||0)+1;
+    counts['all'] = (counts['all']||0)+1;
+  });
+  Object.keys(counts).forEach(k => {
+    const el = document.getElementById('badge-'+k);
+    if(el) el.textContent = counts[k];
+  });
+  const statsEl = document.getElementById('stats-grid');
+  const total30 = ALL_DATA.filter(i => i.published_at && i.published_at >= new Date(Date.now()-30*864e5).toISOString()).length;
+  const regCount = ALL_DATA.filter(i => i.item_type==='regulatory').length;
+  const highRel = ALL_DATA.filter(i => i.relevance >= 0.5).length;
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="num">${ALL_DATA.length}</div><div class="label">情报总条数</div></div>
+    <div class="stat-card"><div class="num">${total30}</div><div class="label">近30天新增</div></div>
+    <div class="stat-card"><div class="num">${regCount}</div><div class="label">法规情报</div></div>
+    <div class="stat-card"><div class="num">${highRel}</div><div class="label">高相关度</div></div>
+  `;
+}
+
+function renderRegulatory() {
+  const feed = document.getElementById('regulatory-feed');
+  feed.innerHTML = REGULATORY.map(item => {
+    const date = item.published_at ? item.published_at.slice(0,10) : '';
+    const catLabel = CAT_LABELS[item.category] || item.category;
+    const regionLabel = REGION_LABELS[item.region] || item.region;
+    return `<div class="feed-item" style="border-left-color:#ef4444">
+      <div class="item-header">
+        <h4><a href="${item.url || '#'}" target="_blank" rel="noopener">${item.title || '(无标题)'}</a></h4>
+      </div>
+      <div class="summary">${item.summary || ''}</div>
+      <div class="meta">
+        <span class="tag tag-type-regulatory">法规监管</span>
+        <span class="tag tag-cat">${catLabel}</span>
+        <span class="tag tag-region">${regionLabel}</span>
+        <span class="item-source">${item.source || ''}</span>
+        <span class="item-date">${date}</span>
+      </div>
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);padding:20px">暂无法规情报</div>';
+}
+
+function renderLog() {
+  const tbody = document.getElementById('log-body');
+  tbody.innerHTML = FETCH_LOG.map(row => `<tr>
+    <td>${row.source_name}</td>
+    <td style="color:var(--muted)">${row.fetched_at||''}</td>
+    <td>${row.items_found}</td>
+    <td>${row.items_new}</td>
+    <td class="status-${row.status}">${row.status}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">暂无日志</td></tr>';
+}
+
+function initCharts() {
+  const catCtx = document.getElementById('cat-chart').getContext('2d');
+  new Chart(catCtx, {
+    type: 'doughnut',
+    data: {
+      labels: CAT_COUNTS.map(r => CAT_LABELS[r.category]||r.category),
+      datasets: [{ data: CAT_COUNTS.map(r => r.cnt), backgroundColor: CAT_COUNTS.map(r => CAT_COLORS[r.category]||'#64748b'), borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { labels: { color: '#94a3b8', font: {size:11} } } }, maintainAspectRatio: false }
+  });
+  const regCtx = document.getElementById('region-chart').getContext('2d');
+  new Chart(regCtx, {
+    type: 'doughnut',
+    data: {
+      labels: REGION_COUNTS.map(r => REGION_LABELS[r.region]||r.region),
+      datasets: [{ data: REGION_COUNTS.map(r => r.cnt), backgroundColor: REGION_COUNTS.map(r => REGION_COLORS[r.region]||'#64748b'), borderWidth: 0 }]
+    },
+    options: { plugins: { legend: { labels: { color: '#94a3b8', font: {size:11} } } }, maintainAspectRatio: false }
+  });
+  const days = [...new Set(TREND.map(r => r.day))].sort();
+  const cats = ['sweeteners','colorants','flavors','functional_ingredients','general'];
+  const datasets = cats.map(cat => ({
+    label: CAT_LABELS[cat]||cat,
+    data: days.map(day => { const row = TREND.find(r => r.day===day && r.category===cat); return row ? row.cnt : 0; }),
+    borderColor: CAT_COLORS[cat]||'#64748b',
+    backgroundColor: (CAT_COLORS[cat]||'#64748b')+'33',
+    fill: true, tension: 0.3, pointRadius: 0,
+  }));
+  const trendCtx = document.getElementById('trend-chart').getContext('2d');
+  new Chart(trendCtx, {
+    type: 'line',
+    data: { labels: days, datasets },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: '#64748b', maxTicksLimit: 10, font:{size:10} }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', font:{size:10} }, grid: { color: '#1e293b' }, beginAtZero: true }
+      },
+      plugins: { legend: { labels: { color: '#94a3b8', font:{size:11}, boxWidth:12 } } }
+    }
+  });
+}
+
+renderStats();
+renderFeed();
+</script>
+</body>
+</html>
