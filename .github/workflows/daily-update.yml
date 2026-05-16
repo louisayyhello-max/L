@@ -1,0 +1,47 @@
+name: Daily Intelligence Update
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 每天 01:00 UTC = 北京时间 09:00
+  workflow_dispatch:        # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: claude/food-additives-market-intel-ovUUk
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Restore database cache
+        uses: actions/cache@v4
+        with:
+          path: database/intel.db
+          key: intel-db-${{ github.run_id }}
+          restore-keys: |
+            intel-db-
+
+      - name: Collect data and build dashboard
+        env:
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+        run: python pipeline.py
+
+      - name: Deploy to GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python pipeline.py --deploy

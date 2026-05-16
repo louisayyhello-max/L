@@ -72,8 +72,9 @@ def _search(query: str, api_key: str, from_date: str, max_results: int = 30) -> 
 
 
 def collect_newsapi() -> list[dict]:
+    import os
     cfg = _load_config()
-    api_key = cfg.get("newsapi", {}).get("key", "").strip()
+    api_key = (os.environ.get("NEWSAPI_KEY") or cfg.get("newsapi", {}).get("key", "")).strip()
     if not api_key:
         print("[NewsAPI] No API key configured — skipping.")
         return []
