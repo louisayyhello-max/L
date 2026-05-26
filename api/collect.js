@@ -17,54 +17,136 @@ const DB_PATH = join(__dirname, 'foodreg.db');
 
 // ─── RSS Sources ──────────────────────────────────────────────────────────────
 const SOURCES = [
-  // Official regulators
-  { url: 'https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/food/rss.xml', region: 'usa', source: 'FDA', country: 'US' },
-  { url: 'https://www.efsa.europa.eu/en/rss/rss.xml', region: 'eu', source: 'EFSA', country: 'EU' },
+  // ── 欧美官方监管机构 ──────────────────────────────────────────
+  { url: 'https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/food/rss.xml',       region: 'usa',    source: 'FDA',              country: 'US' },
+  { url: 'https://www.efsa.europa.eu/en/rss/rss.xml',                                             region: 'eu',     source: 'EFSA',             country: 'EU' },
 
-  // Trade media – global
-  { url: 'https://www.foodnavigator.com/rss/editorial.rss', region: 'global', source: 'FoodNavigator', country: '' },
-  { url: 'https://www.foodnavigator-asia.com/rss/editorial.rss', region: 'sea', source: 'FoodNavigator Asia', country: '' },
-  { url: 'https://www.foodingredientsfirst.com/rss/editorial.rss', region: 'global', source: 'Food Ingredients First', country: '' },
-  { url: 'https://www.nutraingredients.com/rss/editorial.rss', region: 'global', source: 'Nutraingredients', country: '' },
-  { url: 'https://www.nutraingredients-asia.com/rss/editorial.rss', region: 'sea', source: 'Nutraingredients Asia', country: '' },
-  { url: 'https://www.foodbusinessnews.net/rss/news', region: 'global', source: 'Food Business News', country: '' },
+  // ── 中国官方 & 行业媒体 ────────────────────────────────────────
+  // 食品伙伴网（中国最大食品行业门户，覆盖GB标准/卫健委公告）
+  { url: 'https://www.foodmate.net/rss.xml',                                                       region: 'china',  source: '食品伙伴网',        country: 'CN' },
+  // 中国食品报网
+  { url: 'https://www.cnfood.cn/rss.xml',                                                          region: 'china',  source: '中国食品报',        country: 'CN' },
+  // 食品安全导刊
+  { url: 'https://www.食品安全导刊.cn/rss.xml',                                                    region: 'china',  source: '食品安全导刊',      country: 'CN' },
+  // 中国质量新闻网-食品
+  { url: 'https://www.cqn.com.cn/rss/food.xml',                                                    region: 'china',  source: '中国质量新闻网',    country: 'CN' },
 
-  // Google News keyword RSS (no API key needed)
-  { url: 'https://news.google.com/rss/search?q=food+additive+regulation+FDA+EFSA&hl=en-US&gl=US&ceid=US:en', region: 'global', source: 'Google News', country: '' },
-  { url: 'https://news.google.com/rss/search?q=food+colorant+ban+approval+2025+2026&hl=en-US&gl=US&ceid=US:en', region: 'global', source: 'Google News', country: '' },
-  { url: 'https://news.google.com/rss/search?q=sweetener+regulation+stevia+aspartame+sucralose&hl=en-US&gl=US&ceid=US:en', region: 'global', source: 'Google News', country: '' },
-  { url: 'https://news.google.com/rss/search?q=%E9%A3%9F%E5%93%81%E6%B7%BB%E5%8A%A0%E5%89%82+%E6%B3%95%E8%A7%84+%E5%8D%AB%E5%81%A5%E5%A7%94&hl=zh-CN&gl=CN&ceid=CN:zh-Hans', region: 'china', source: 'Google News CN', country: 'CN' },
-  { url: 'https://news.google.com/rss/search?q=food+additive+ASEAN+Southeast+Asia+halal&hl=en-US&gl=US&ceid=US:en', region: 'sea', source: 'Google News SEA', country: '' },
-  { url: 'https://news.google.com/rss/search?q=food+additive+GCC+halal+Middle+East&hl=en-US&gl=US&ceid=US:en', region: 'mea', source: 'Google News MEA', country: '' },
+  // ── 中国 Google News 多关键词（覆盖官方公告/行业动态）──────────
+  { url: 'https://news.google.com/rss/search?q=GB+2760+食品添加剂+标准&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',                       region: 'china', source: 'Google News CN', country: 'CN' },
+  { url: 'https://news.google.com/rss/search?q=卫健委+食品添加剂+公告+批准&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',                   region: 'china', source: 'Google News CN', country: 'CN' },
+  { url: 'https://news.google.com/rss/search?q=新食品原料+食品安全国家标准+卫健委&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',             region: 'china', source: 'Google News CN', country: 'CN' },
+  { url: 'https://news.google.com/rss/search?q=国家市场监督管理总局+食品添加剂+公告&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',           region: 'china', source: 'Google News CN', country: 'CN' },
+  { url: 'https://news.google.com/rss/search?q=食品色素+甜味剂+防腐剂+法规+2025&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',              region: 'china', source: 'Google News CN', country: 'CN' },
+  { url: 'https://news.google.com/rss/search?q=China+food+additive+regulation+GB2760+NHSA&hl=en-US&gl=US&ceid=US:en',         region: 'china', source: 'Google News CN', country: 'CN' },
+
+  // ── 全球行业媒体 ───────────────────────────────────────────────
+  { url: 'https://www.foodnavigator.com/rss/editorial.rss',          region: 'global', source: 'FoodNavigator',         country: '' },
+  { url: 'https://www.foodnavigator-asia.com/rss/editorial.rss',     region: 'sea',    source: 'FoodNavigator Asia',    country: '' },
+  { url: 'https://www.foodingredientsfirst.com/rss/editorial.rss',   region: 'global', source: 'Food Ingredients First',country: '' },
+  { url: 'https://www.nutraingredients.com/rss/editorial.rss',       region: 'global', source: 'Nutraingredients',      country: '' },
+  { url: 'https://www.nutraingredients-asia.com/rss/editorial.rss',  region: 'sea',    source: 'Nutraingredients Asia', country: '' },
+  { url: 'https://www.foodbusinessnews.net/rss/news',                region: 'global', source: 'Food Business News',    country: '' },
+
+  // ── 全球/欧美 Google News ──────────────────────────────────────
+  { url: 'https://news.google.com/rss/search?q=food+additive+regulation+FDA+EFSA+ban+approval&hl=en-US&gl=US&ceid=US:en',     region: 'global', source: 'Google News', country: '' },
+  { url: 'https://news.google.com/rss/search?q=food+colorant+dye+ban+approval+regulation&hl=en-US&gl=US&ceid=US:en',          region: 'global', source: 'Google News', country: '' },
+  { url: 'https://news.google.com/rss/search?q=sweetener+regulation+stevia+aspartame+sucralose+2025&hl=en-US&gl=US&ceid=US:en', region: 'global', source: 'Google News', country: '' },
+  { url: 'https://news.google.com/rss/search?q=food+preservative+emulsifier+standard+regulation&hl=en-US&gl=US&ceid=US:en',   region: 'global', source: 'Google News', country: '' },
+
+  // ── 东南亚 ─────────────────────────────────────────────────────
+  { url: 'https://news.google.com/rss/search?q=food+additive+ASEAN+BPOM+Singapore+Malaysia+Thailand&hl=en-US&gl=US&ceid=US:en', region: 'sea', source: 'Google News SEA', country: '' },
+  { url: 'https://news.google.com/rss/search?q=halal+food+additive+ingredient+ASEAN&hl=en-US&gl=US&ceid=US:en',                  region: 'sea', source: 'Google News SEA', country: '' },
+
+  // ── 中东 ───────────────────────────────────────────────────────
+  { url: 'https://news.google.com/rss/search?q=food+additive+GCC+halal+SFDA+UAE+Saudi&hl=en-US&gl=US&ceid=US:en',                region: 'mea', source: 'Google News MEA', country: '' },
+  { url: 'https://news.google.com/rss/search?q=食品添加剂+清真+海湾+沙特+阿联酋&hl=zh-CN&gl=CN&ceid=CN:zh-Hans',                 region: 'mea', source: 'Google News MEA', country: '' },
 ];
 
 // ─── Keyword Classification ───────────────────────────────────────────────────
 const CATEGORY_KEYWORDS = {
-  colorants:           ['color', 'colour', 'dye', 'pigment', 'tartrazine', 'e102', 'e110', 'e120', 'e129', 'e133', 'e171', 'beta-carotene', 'curcumin', 'carmine', 'allura', 'sunset yellow', 'brilliant blue', '色素', '着色剂', '二氧化钛', '柠檬黄', '日落黄', '胭脂红'],
-  sweeteners:          ['sweetener', 'aspartame', 'stevia', 'sucralose', 'saccharin', 'acesulfame', 'erythritol', 'allulose', 'xylitol', 'sorbitol', 'sugar alcohol', 'e950', 'e951', 'e954', 'e955', 'e960', 'e968', '甜味剂', '阿斯巴甜', '甜菊', '三氯蔗糖', '赤藓糖醇', '阿洛酮糖'],
-  preservatives:       ['preservative', 'benzoate', 'sorbate', 'natamycin', 'nisin', 'e200', 'e211', 'e234', 'e235', 'antimicrobial', 'shelf life', '防腐剂', '苯甲酸', '山梨酸', '纳他霉素'],
-  emulsifiers:         ['emulsifier', 'lecithin', 'carrageenan', 'guar gum', 'xanthan', 'pectin', 'e322', 'e407', 'e415', 'stabilizer', 'thickener', '乳化剂', '卡拉胶', '黄原胶', '果胶'],
-  flavor_enhancers:    ['flavor enhancer', 'flavour enhancer', 'glutamate', 'msg', 'umami', 'e621', 'e631', 'inosinate', '增味剂', '味精', '谷氨酸钠'],
-  antioxidants:        ['antioxidant', 'bha', 'bht', 'tocopherol', 'ascorbic', 'e300', 'e320', 'e306', '抗氧化剂'],
-  functional_ingredients: ['probiotic', 'prebiotic', 'omega', 'collagen', 'hyaluronic', 'nmn', 'coenzyme', 'botanical', 'novel food', '功能性', '益生菌', '胶原蛋白', '透明质酸', '新食品原料'],
+  colorants: [
+    'color', 'colour', 'dye', 'pigment', 'tartrazine', 'e102', 'e110', 'e120', 'e129', 'e133', 'e171',
+    'beta-carotene', 'curcumin', 'carmine', 'allura', 'sunset yellow', 'brilliant blue', 'erythrosine',
+    'red 40', 'yellow 5', 'yellow 6', 'spirulina', 'anthocyanin', 'butterfly pea', 'gardenia',
+    '色素', '着色剂', '染料', '二氧化钛', '柠檬黄', '日落黄', '胭脂红', '诱惑红', '亮蓝',
+    '姜黄素', 'β-胡萝卜素', '花青素', '叶绿素', '栀子蓝', '辣椒红', '红曲红',
+  ],
+  sweeteners: [
+    'sweetener', 'aspartame', 'stevia', 'steviol', 'sucralose', 'saccharin', 'acesulfame',
+    'erythritol', 'allulose', 'xylitol', 'sorbitol', 'maltitol', 'monk fruit', 'luo han guo',
+    'sugar alcohol', 'intense sweetener', 'low calorie', 'zero sugar',
+    'e950', 'e951', 'e954', 'e955', 'e960', 'e968',
+    '甜味剂', '阿斯巴甜', '甜菊糖', '甜菊苷', '三氯蔗糖', '安赛蜜', '糖精',
+    '赤藓糖醇', '阿洛酮糖', '木糖醇', '麦芽糖醇', '罗汉果', '甜蜜素',
+  ],
+  preservatives: [
+    'preservative', 'benzoate', 'sorbate', 'natamycin', 'nisin', 'propionic', 'sulfite',
+    'antimicrobial', 'shelf life', 'mold inhibit', 'antifungal',
+    'e200', 'e202', 'e210', 'e211', 'e220', 'e234', 'e235',
+    '防腐剂', '苯甲酸', '苯甲酸钠', '山梨酸', '山梨酸钾', '纳他霉素', '乳酸链球菌素',
+    '丙酸', '亚硫酸盐', '抑菌',
+  ],
+  emulsifiers: [
+    'emulsifier', 'lecithin', 'carrageenan', 'guar gum', 'xanthan', 'pectin', 'gellan',
+    'agar', 'starch', 'modified starch', 'cellulose', 'stabilizer', 'thickener', 'gelling agent',
+    'e322', 'e407', 'e410', 'e412', 'e415', 'e440', 'e460',
+    '乳化剂', '卡拉胶', '黄原胶', '瓜尔胶', '果胶', '卵磷脂', '琼脂',
+    '增稠剂', '稳定剂', '变性淀粉', '甲基纤维素',
+  ],
+  flavor_enhancers: [
+    'flavor enhancer', 'flavour enhancer', 'glutamate', 'msg', 'umami', 'inosinate', 'guanylate',
+    'e621', 'e627', 'e631', 'e635', 'yeast extract',
+    '增味剂', '味精', '谷氨酸钠', '鸡精', '肌苷酸', '鸟苷酸', '酵母提取物',
+  ],
+  antioxidants: [
+    'antioxidant', 'bha', 'bht', 'tbhq', 'tocopherol', 'ascorbic acid', 'vitamin c', 'vitamin e',
+    'rosemary extract', 'e300', 'e306', 'e307', 'e320', 'e321', 'e319',
+    '抗氧化剂', 'BHA', 'BHT', '维生素C', '维生素E', '生育酚', '迷迭香提取物', '没食子酸丙酯',
+  ],
+  functional_ingredients: [
+    'probiotic', 'prebiotic', 'postbiotic', 'omega', 'dha', 'epa', 'collagen', 'hyaluronic',
+    'nmn', 'nad', 'coenzyme q10', 'botanical', 'herbal extract', 'novel food', 'new food ingredient',
+    'phospholipid', 'plant sterol', 'inulin', 'fos', 'gos',
+    '功能性', '益生菌', '益生元', '胶原蛋白', '透明质酸', '玻尿酸',
+    '新食品原料', '植物提取物', '植物甾醇', '菊粉', '低聚果糖', '磷脂',
+  ],
 };
 
 const REGION_KEYWORDS = {
-  eu:    ['efsa', 'european commission', 'eu regulation', 'eur-lex', 'regulation ec', 'regulation eu', 'european food', 'europe', 'european parliament'],
-  usa:   ['fda', 'usda', 'federal register', 'gras', 'cfr', 'american', 'united states', 'us food'],
-  china: ['nhsa', 'nhc', 'gb 2760', 'samr', 'china food', '卫健委', '食品安全', '国标', '中国', '农业部', '市场监督'],
-  sea:   ['asean', 'singapore', 'malaysia', 'indonesia', 'thailand', 'vietnam', 'philippines', 'bpom', 'sfa', 'moh malaysia', 'thai fda', '东南亚', '新加坡', '马来西亚', '印尼'],
-  mea:   ['halal', 'gcc', 'saudi', 'sfda', 'uae', 'esma', 'gulf', 'middle east', '清真', '沙特', '海湾', '阿联酋'],
+  eu: [
+    'efsa', 'european commission', 'eu regulation', 'eur-lex', 'regulation ec', 'regulation eu',
+    'european food safety', 'european parliament', 'annex ii', 'e number', 'food additives regulation',
+  ],
+  usa: [
+    'fda', 'usda', 'federal register', 'gras', '21 cfr', 'color additive', 'food safety modernization',
+    'united states', 'american', 'us food and drug',
+  ],
+  china: [
+    'nhsa', 'nhc', 'gb 2760', 'gb2760', 'samr', 'cfsa', 'china food', 'chinese food',
+    '卫健委', '国家卫生健康委', '食品安全', '国家标准', '中国', '市场监督', '食药监',
+    '新食品原料', '食品添加剂公告', '农业农村部', '海关总署', '食品伙伴', '食品法规',
+    '国家食品安全', '风险评估中心',
+  ],
+  sea: [
+    'asean', 'singapore', 'malaysia', 'indonesia', 'thailand', 'vietnam', 'philippines',
+    'bpom', 'sfa', 'moh malaysia', 'thai fda', 'mfds', 'accsq',
+    '东南亚', '新加坡', '马来西亚', '印尼', '印度尼西亚', '泰国', '越南', '菲律宾',
+  ],
+  mea: [
+    'halal', 'gcc', 'saudi', 'sfda', 'uae', 'esma', 'gulf', 'middle east',
+    'egypt', 'turkey', 'iran', 'pakistan', 'nigeria', 'south africa',
+    '清真', '沙特', '海湾', '阿联酋', '中东', '非洲',
+  ],
 };
 
 const TYPE_KEYWORDS = {
-  ban:            ['ban', 'banned', 'prohibit', 'revoke', 'withdraw', '禁止', '撤销', '撤回'],
-  approval:       ['approv', 'authoriz', 'permit', 'gras', 'new approval', '批准', '许可', '获批'],
-  new_regulation: ['new regulation', 'new standard', 'new law', 'published standard', 'takes effect', 'new rule', '新标准', '新法规', '发布', '施行', '实施'],
-  amendment:      ['amend', 'revise', 'update', 'modify', 'change limit', '修订', '修改', '更新'],
-  consultation:   ['consult', 'comment', 'proposal', 'draft', 'public notice', '征求意见', '草案', '征询'],
-  guidance:       ['guidance', 'guideline', 'recommendation', 'advisory', '指南', '指导', '建议'],
-  safety_assessment: ['safety assessment', 'safety evaluation', 'adi', 'toxicolog', 'risk assessment', 'efsa opinion', '安全评估', '毒理', '风险评估'],
+  ban:               ['ban', 'banned', 'prohibit', 'revoke authoriz', 'withdraw', 'phase out', 'no longer permitted', '禁止', '撤销', '撤回', '淘汰', '停止使用'],
+  approval:          ['approv', 'authoriz', 'permit', 'gras', 'new approval', 'cleared', 'listed', '批准', '许可', '获批', '列入', '准用'],
+  new_regulation:    ['new regulation', 'new standard', 'new law', 'takes effect', 'enters into force', 'new rule', 'published standard', '新标准', '新法规', '发布', '施行', '实施', '正式实施'],
+  amendment:         ['amend', 'revise', 'update', 'modify', 'change limit', 'revised level', '修订', '修改', '更新', '调整限量', '修正'],
+  consultation:      ['consult', 'comment', 'proposal', 'draft', 'public notice', 'call for data', '征求意见', '草案', '公开征询', '征集数据'],
+  guidance:          ['guidance', 'guideline', 'recommendation', 'advisory', 'FAQ', '指南', '指导', '建议', '问答'],
+  safety_assessment: ['safety assessment', 'safety evaluation', 'adi', 'tolerable', 'toxicolog', 'risk assessment', 'efsa opinion', 're-evaluation', '安全评估', '毒理', '风险评估', '重新评价'],
 };
 
 function score(text, keywords) {
