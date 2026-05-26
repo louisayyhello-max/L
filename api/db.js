@@ -42,6 +42,7 @@ export function initDB() {
 
     CREATE TABLE IF NOT EXISTS regulatory_updates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uid TEXT UNIQUE,
       title TEXT NOT NULL,
       title_zh TEXT,
       summary TEXT,

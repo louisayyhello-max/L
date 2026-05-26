@@ -16,3 +16,4 @@ api/foodreg.db-shm
 api/foodreg.db-wal
 webapp/node_modules/
 webapp/dist/
+logs/*.log
