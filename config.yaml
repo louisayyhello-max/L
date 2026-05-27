@@ -18,8 +18,8 @@ categories:
     trade_codes: ["3302", "3301"]
 
   functional_ingredients:
-    zh: ["新食品原料", "功能性食品", "益生菌", "植物提取物", "胶原蛋白", "透明质酸", "NMN", "人参提取物", "姜黄提取物", "功能成分"]
-    en: ["novel food ingredient", "functional ingredient", "probiotic", "plant extract", "collagen", "hyaluronic acid", "NMN", "botanical extract", "nutraceutical"]
+    zh: ["新食品原料", "功能性食品", "益生菌", "植物提取物", "胶原蛋白", "透明质酸", "NMN", "人参提取物", "姜黄提取物", "功能成分", "芹菜素", "盐酸小檗碱", "小檗碱", "黄酮", "木犀草素", "染料木素", "大豆异黄酮"]
+    en: ["novel food ingredient", "functional ingredient", "probiotic", "plant extract", "collagen", "hyaluronic acid", "NMN", "botanical extract", "nutraceutical", "apigenin", "berberine hydrochloride", "berberine", "flavonoid", "luteolin", "genistein", "isoflavone"]
     trade_codes: ["2106", "1302"]
 
 # ── 目标市场 ──────────────────────────────────────────────
@@ -110,6 +110,10 @@ rss_feeds:
       lang: "zh-CN"
     - query: "植物提取物 胶原蛋白 NMN 市场"
       lang: "zh-CN"
+    - query: "芹菜素 盐酸小檗碱 木犀草素 染料木素 黄酮"
+      lang: "zh-CN"
+    - query: "apigenin berberine luteolin genistein flavonoid market"
+      lang: "en"
 
 # ── 系统配置 ──────────────────────────────────────────────
 system:
