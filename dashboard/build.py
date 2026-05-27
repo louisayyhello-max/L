@@ -3,7 +3,6 @@ Generate a self-contained HTML dashboard from the intelligence database.
 No server required — just open dashboard/index.html in a browser.
 """
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,12 +31,6 @@ TYPE_LABELS = {
     "regulatory": "法规监管",
     "market": "市场信号",
     "competitor": "竞争情报",
-}
-TYPE_COLORS = {
-    "news": "#3b82f6",
-    "regulatory": "#ef4444",
-    "market": "#10b981",
-    "competitor": "#f59e0b",
 }
 
 
@@ -70,33 +63,34 @@ def _build_html(data: dict, generated_at: str) -> str:
   header h1 {{ font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }}
   header .meta {{ color: var(--muted); font-size: 12px; }}
   .layout {{ display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 57px); }}
-  /* Sidebar */
   aside {{ background: var(--surface); border-right: 1px solid var(--surface2); padding: 16px 0; }}
   .sidebar-section {{ padding: 8px 16px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }}
   .filter-btn {{ display: block; width: 100%; padding: 8px 20px; text-align: left; background: none; border: none; color: var(--text); cursor: pointer; font-size: 13px; border-left: 3px solid transparent; transition: all 0.15s; }}
   .filter-btn:hover {{ background: var(--surface2); color: var(--accent); }}
   .filter-btn.active {{ border-left-color: var(--accent); background: rgba(56,189,248,0.08); color: var(--accent); font-weight: 600; }}
   .filter-btn .badge {{ float: right; background: var(--surface2); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--muted); }}
-  /* Main */
   main {{ overflow-y: auto; padding: 20px; }}
   .section-title {{ font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-top: 20px; }}
   .section-title:first-child {{ margin-top: 0; }}
-  /* Stats row */
   .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }}
   .stat-card {{ background: var(--surface); border-radius: 8px; padding: 14px 16px; border: 1px solid var(--surface2); }}
   .stat-card .num {{ font-size: 28px; font-weight: 800; color: var(--accent); }}
   .stat-card .label {{ color: var(--muted); font-size: 12px; margin-top: 2px; }}
-  /* Charts */
   .charts-row {{ display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin-bottom: 20px; }}
   .chart-card {{ background: var(--surface); border-radius: 8px; padding: 16px; border: 1px solid var(--surface2); }}
   .chart-card h3 {{ font-size: 13px; color: var(--muted); margin-bottom: 12px; }}
   .chart-card canvas {{ max-height: 200px; }}
-  /* Search */
-  .search-bar {{ display: flex; gap: 8px; margin-bottom: 16px; }}
-  .search-bar input {{ flex: 1; background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; }}
-  .search-bar input:focus {{ border-color: var(--accent); }}
-  .search-bar select {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }}
-  /* Feed */
+  /* Search + date filter bar */
+  .filter-bar {{ display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }}
+  .filter-bar input[type="text"] {{ flex: 1; min-width: 160px; background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; }}
+  .filter-bar input[type="text"]:focus {{ border-color: var(--accent); }}
+  .filter-bar input[type="date"] {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 12px; outline: none; cursor: pointer; color-scheme: dark; }}
+  .filter-bar input[type="date"]:focus {{ border-color: var(--accent); }}
+  .filter-bar select {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }}
+  .filter-bar label {{ color: var(--muted); font-size: 12px; white-space: nowrap; }}
+  .date-range {{ display: flex; align-items: center; gap: 6px; }}
+  .clear-btn {{ background: var(--surface2); border: none; border-radius: 6px; padding: 7px 12px; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }}
+  .clear-btn:hover {{ color: var(--text); }}
   #feed {{ display: flex; flex-direction: column; gap: 8px; }}
   .feed-item {{ background: var(--surface); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--surface2); border-left: 3px solid var(--news); transition: border-color 0.15s; cursor: pointer; }}
   .feed-item:hover {{ border-color: var(--accent); }}
@@ -116,19 +110,54 @@ def _build_html(data: dict, generated_at: str) -> str:
   .item-date {{ color: var(--muted); font-size: 11px; }}
   .item-source {{ color: var(--muted); font-size: 11px; }}
   .relevance-dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }}
-  /* Pagination */
   .pagination {{ display: flex; gap: 6px; justify-content: center; margin-top: 16px; }}
   .page-btn {{ background: var(--surface); border: 1px solid var(--surface2); border-radius: 6px; padding: 6px 12px; color: var(--text); cursor: pointer; font-size: 13px; }}
   .page-btn.active {{ background: var(--accent); color: #0f172a; font-weight: 700; border-color: var(--accent); }}
   .page-btn:hover:not(.active) {{ border-color: var(--accent); }}
-  /* Log */
-  #log-section {{ display: none; }}
   .log-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
   .log-table th {{ background: var(--surface2); padding: 8px 10px; text-align: left; color: var(--muted); }}
   .log-table td {{ padding: 7px 10px; border-bottom: 1px solid var(--surface2); }}
   .log-table tr:hover td {{ background: var(--surface2); }}
   .status-ok {{ color: #10b981; }} .status-error {{ color: #ef4444; }}
   .hidden {{ display: none; }}
+  /* ── Weekly Briefing ── */
+  .briefing-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }}
+  .briefing-header h2 {{ font-size: 18px; font-weight: 800; color: var(--accent); }}
+  .briefing-meta {{ color: var(--muted); font-size: 12px; }}
+  .print-btn {{ background: var(--accent); color: #0f172a; border: none; border-radius: 6px; padding: 8px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }}
+  .print-btn:hover {{ opacity: 0.85; }}
+  .briefing-stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 24px; }}
+  .briefing-stat {{ background: var(--surface); border-radius: 8px; padding: 12px 14px; border: 1px solid var(--surface2); text-align: center; }}
+  .briefing-stat .num {{ font-size: 24px; font-weight: 800; color: var(--accent); }}
+  .briefing-stat .label {{ color: var(--muted); font-size: 11px; margin-top: 2px; }}
+  .briefing-section {{ background: var(--surface); border-radius: 10px; border: 1px solid var(--surface2); margin-bottom: 16px; overflow: hidden; }}
+  .briefing-section-header {{ padding: 12px 16px; border-bottom: 1px solid var(--surface2); display: flex; align-items: center; gap: 8px; }}
+  .briefing-section-header h3 {{ font-size: 14px; font-weight: 700; }}
+  .briefing-section-header .count-badge {{ background: var(--surface2); border-radius: 10px; padding: 2px 8px; font-size: 11px; color: var(--muted); }}
+  .briefing-item {{ padding: 10px 16px; border-bottom: 1px solid var(--surface2); }}
+  .briefing-item:last-child {{ border-bottom: none; }}
+  .briefing-item-title {{ font-size: 13px; font-weight: 600; margin-bottom: 3px; }}
+  .briefing-item-title a {{ color: var(--text); text-decoration: none; }}
+  .briefing-item-title a:hover {{ color: var(--accent); }}
+  .briefing-item-meta {{ color: var(--muted); font-size: 11px; display: flex; gap: 8px; }}
+  .no-data {{ color: var(--muted); padding: 16px; font-size: 13px; }}
+  /* Print styles */
+  @media print {{
+    body {{ background: #fff; color: #111; font-size: 12px; }}
+    header, aside, .print-btn, .briefing-header .print-btn {{ display: none !important; }}
+    .layout {{ display: block; }}
+    main {{ padding: 0; }}
+    #briefing-section {{ display: block !important; }}
+    #feed-section, #regulatory-section, #charts-section, #log-section {{ display: none !important; }}
+    .briefing-section {{ border: 1px solid #ccc; page-break-inside: avoid; margin-bottom: 12px; }}
+    .briefing-section-header {{ background: #f1f5f9; }}
+    .briefing-section-header h3, .briefing-header h2 {{ color: #0f172a; }}
+    .briefing-stat {{ border: 1px solid #ccc; }}
+    .briefing-stat .num {{ color: #0284c7; }}
+    .briefing-meta, .briefing-item-meta {{ color: #64748b; }}
+    .briefing-item-title a {{ color: #111; }}
+    .tag {{ border: 1px solid #ccc; background: #f8fafc; color: #334155; }}
+  }}
 </style>
 </head>
 <body>
@@ -140,6 +169,7 @@ def _build_html(data: dict, generated_at: str) -> str:
   <aside>
     <div class="sidebar-section">视图</div>
     <button class="filter-btn active" onclick="setView('feed')">📰 情报总览</button>
+    <button class="filter-btn" onclick="setView('briefing')">📋 本周简报</button>
     <button class="filter-btn" onclick="setView('regulatory')">⚖️ 法规追踪</button>
     <button class="filter-btn" onclick="setView('charts')">📊 趋势分析</button>
     <button class="filter-btn" onclick="setView('log')">🔄 采集日志</button>
@@ -174,15 +204,36 @@ def _build_html(data: dict, generated_at: str) -> str:
     <div id="feed-section">
       <div class="stats-grid" id="stats-grid"></div>
       <div class="section-title">情报列表</div>
-      <div class="search-bar">
-        <input type="text" id="search-input" placeholder="搜索标题、摘要、来源..." oninput="onSearch()">
+      <div class="filter-bar">
+        <input type="text" id="search-input" placeholder="搜索标题、摘要、来源关键词..." oninput="onSearch()">
+        <div class="date-range">
+          <label>从</label>
+          <input type="date" id="date-from" onchange="renderFeed()">
+          <label>至</label>
+          <input type="date" id="date-to" onchange="renderFeed()">
+        </div>
+        <button class="clear-btn" onclick="clearFilters()">清除筛选</button>
         <select id="sort-select" onchange="renderFeed()">
           <option value="date">按时间排序</option>
           <option value="relevance">按相关性排序</option>
         </select>
       </div>
+      <div id="result-count" style="color:var(--muted);font-size:12px;margin-bottom:8px;"></div>
       <div id="feed"></div>
       <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Briefing View -->
+    <div id="briefing-section" class="hidden">
+      <div class="briefing-header">
+        <div>
+          <h2>📋 本周市场情报简报</h2>
+          <div class="briefing-meta" id="briefing-period"></div>
+        </div>
+        <button class="print-btn" onclick="window.print()">🖨️ 打印 / 导出PDF</button>
+      </div>
+      <div class="briefing-stats" id="briefing-stats"></div>
+      <div id="briefing-body"></div>
     </div>
 
     <!-- Regulatory View -->
@@ -225,6 +276,7 @@ const REGION_LABELS = {{china:'🇨🇳 中国',eu:'🇪🇺 欧盟',usa:'🇺�
 const TYPE_LABELS = {{news:'行业动态',regulatory:'法规监管',market:'市场信号',competitor:'竞争情报'}};
 const CAT_COLORS = {{sweeteners:'#a78bfa',colorants:'#f472b6',flavors:'#34d399',functional_ingredients:'#fb923c',general:'#60a5fa'}};
 const REGION_COLORS = {{china:'#f87171',eu:'#60a5fa',usa:'#34d399',sea:'#fbbf24',mea:'#a78bfa',global:'#94a3b8'}};
+const CAT_ICONS = {{sweeteners:'🍬',colorants:'🎨',flavors:'🌸',functional_ingredients:'💊',general:'📋'}};
 
 let currentCat = 'all', currentRegion = 'all', currentType = 'all';
 let searchTerm = '', currentPage = 1;
@@ -232,7 +284,7 @@ const PAGE_SIZE = 25;
 let chartsInit = false;
 
 function setView(view) {{
-  ['feed','regulatory','charts','log'].forEach(v => {{
+  ['feed','briefing','regulatory','charts','log'].forEach(v => {{
     document.getElementById(v+'-section').classList.toggle('hidden', v !== view);
   }});
   document.querySelectorAll('aside .filter-btn').forEach(b => {{
@@ -242,6 +294,7 @@ function setView(view) {{
   if(view === 'charts' && !chartsInit) {{ initCharts(); chartsInit = true; }}
   if(view === 'regulatory') renderRegulatory();
   if(view === 'log') renderLog();
+  if(view === 'briefing') renderBriefing();
 }}
 
 function filterCat(cat) {{
@@ -267,13 +320,25 @@ function onSearch() {{
   currentPage = 1;
   renderFeed();
 }}
+function clearFilters() {{
+  document.getElementById('search-input').value = '';
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  searchTerm = '';
+  currentPage = 1;
+  renderFeed();
+}}
 
 function getFiltered() {{
+  const dateFrom = document.getElementById('date-from').value;
+  const dateTo = document.getElementById('date-to').value;
   return ALL_DATA.filter(item => {{
     if(currentCat !== 'all' && item.category !== currentCat) return false;
     if(currentRegion !== 'all' && item.region !== currentRegion) return false;
     if(currentType !== 'all' && item.item_type !== currentType) return false;
     if(searchTerm && !`${{item.title}} ${{item.summary}} ${{item.source}}`.toLowerCase().includes(searchTerm)) return false;
+    if(dateFrom && item.published_at && item.published_at.slice(0,10) < dateFrom) return false;
+    if(dateTo && item.published_at && item.published_at.slice(0,10) > dateTo) return false;
     return true;
   }});
 }}
@@ -285,7 +350,9 @@ function renderFeed() {{
   else items.sort((a,b) => (b.published_at||'').localeCompare(a.published_at||''));
 
   const total = items.length;
+  document.getElementById('result-count').textContent = total > 0 ? `共 ${{total}} 条结果` : '未找到匹配结果';
   const pages = Math.ceil(total / PAGE_SIZE);
+  if(currentPage > pages && pages > 0) currentPage = pages;
   const pageItems = items.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
 
   const feed = document.getElementById('feed');
@@ -293,9 +360,6 @@ function renderFeed() {{
     const typeColor = {{news:'#3b82f6',regulatory:'#ef4444',market:'#10b981',competitor:'#f59e0b'}}[item.item_type] || '#94a3b8';
     const relevanceColor = item.relevance > 0.6 ? '#10b981' : item.relevance > 0.3 ? '#f59e0b' : '#475569';
     const date = item.published_at ? item.published_at.slice(0,10) : '';
-    const typeLabel = TYPE_LABELS[item.item_type] || item.item_type;
-    const catLabel = CAT_LABELS[item.category] || item.category;
-    const regionLabel = REGION_LABELS[item.region] || item.region;
     return `<div class="feed-item" style="border-left-color:${{typeColor}}">
       <div class="item-header">
         <div class="relevance-dot" style="background:${{relevanceColor}}" title="相关性: ${{Math.round(item.relevance*100)}}%"></div>
@@ -303,16 +367,15 @@ function renderFeed() {{
       </div>
       <div class="summary">${{item.summary || ''}}</div>
       <div class="meta">
-        <span class="tag tag-type-${{item.item_type}}">${{typeLabel}}</span>
-        <span class="tag tag-cat">${{catLabel}}</span>
-        <span class="tag tag-region">${{regionLabel}}</span>
+        <span class="tag tag-type-${{item.item_type}}">${{TYPE_LABELS[item.item_type]||item.item_type}}</span>
+        <span class="tag tag-cat">${{CAT_LABELS[item.category]||item.category}}</span>
+        <span class="tag tag-region">${{REGION_LABELS[item.region]||item.region}}</span>
         <span class="item-source">${{item.source || ''}}</span>
         <span class="item-date">${{date}}</span>
       </div>
     </div>`;
   }}).join('');
 
-  // Pagination
   const pag = document.getElementById('pagination');
   if(pages <= 1) {{ pag.innerHTML = ''; return; }}
   let html = '';
@@ -337,7 +400,6 @@ function renderStats() {{
     const el = document.getElementById('badge-'+k);
     if(el) el.textContent = counts[k];
   }});
-
   const statsEl = document.getElementById('stats-grid');
   const total30 = ALL_DATA.filter(i => i.published_at && i.published_at >= new Date(Date.now()-30*864e5).toISOString()).length;
   const regCount = ALL_DATA.filter(i => i.item_type==='regulatory').length;
@@ -350,12 +412,85 @@ function renderStats() {{
   `;
 }}
 
+function renderBriefing() {{
+  // Past 7 days
+  const now = new Date();
+  const weekAgo = new Date(now - 7*864e5);
+  const weekAgoStr = weekAgo.toISOString().slice(0,10);
+  const todayStr = now.toISOString().slice(0,10);
+
+  const weekData = ALL_DATA.filter(i => i.published_at && i.published_at.slice(0,10) >= weekAgoStr);
+  weekData.sort((a,b) => (b.published_at||'').localeCompare(a.published_at||''));
+
+  // Period label
+  document.getElementById('briefing-period').textContent =
+    `统计周期：${{weekAgoStr}} 至 ${{todayStr}}  |  共 ${{weekData.length}} 条情报`;
+
+  // Stats
+  const regW = weekData.filter(i => i.item_type==='regulatory').length;
+  const mktW = weekData.filter(i => i.item_type==='market').length;
+  const compW = weekData.filter(i => i.item_type==='competitor').length;
+  const highW = weekData.filter(i => i.relevance >= 0.5).length;
+  document.getElementById('briefing-stats').innerHTML = `
+    <div class="briefing-stat"><div class="num">${{weekData.length}}</div><div class="label">本周情报总数</div></div>
+    <div class="briefing-stat"><div class="num">${{regW}}</div><div class="label">法规动态</div></div>
+    <div class="briefing-stat"><div class="num">${{mktW}}</div><div class="label">市场信号</div></div>
+    <div class="briefing-stat"><div class="num">${{compW}}</div><div class="label">竞争情报</div></div>
+    <div class="briefing-stat"><div class="num">${{highW}}</div><div class="label">高相关度</div></div>
+  `;
+
+  // Sections: regulatory first, then by category
+  let html = '';
+
+  // Regulatory highlights
+  const regItems = weekData.filter(i => i.item_type==='regulatory').slice(0, 8);
+  html += briefingSection('⚖️ 法规监管动态', regItems, '#ef4444');
+
+  // By category
+  const cats = ['sweeteners','colorants','flavors','functional_ingredients'];
+  cats.forEach(cat => {{
+    const items = weekData.filter(i => i.category === cat).slice(0, 6);
+    html += briefingSection(CAT_ICONS[cat]+' '+CAT_LABELS[cat], items, CAT_COLORS[cat]);
+  }});
+
+  // Market signals
+  const mktItems = weekData.filter(i => i.item_type==='market').slice(0, 6);
+  html += briefingSection('📈 市场信号', mktItems, '#10b981');
+
+  document.getElementById('briefing-body').innerHTML = html;
+}}
+
+function briefingSection(title, items, color) {{
+  if(items.length === 0) return '';
+  const rows = items.map(item => {{
+    const date = item.published_at ? item.published_at.slice(0,10) : '';
+    const regionLabel = REGION_LABELS[item.region] || item.region;
+    const typeLabel = TYPE_LABELS[item.item_type] || item.item_type;
+    return `<div class="briefing-item">
+      <div class="briefing-item-title">
+        <a href="${{item.url||'#'}}" target="_blank" rel="noopener">${{item.title||'(无标题)'}}</a>
+      </div>
+      <div class="briefing-item-meta">
+        <span class="tag tag-type-${{item.item_type}}">${{typeLabel}}</span>
+        <span>${{regionLabel}}</span>
+        <span>${{item.source||''}}</span>
+        <span>${{date}}</span>
+      </div>
+    </div>`;
+  }}).join('');
+  return `<div class="briefing-section">
+    <div class="briefing-section-header" style="border-left:3px solid ${{color}}">
+      <h3>${{title}}</h3>
+      <span class="count-badge">${{items.length}} 条</span>
+    </div>
+    ${{rows}}
+  </div>`;
+}}
+
 function renderRegulatory() {{
   const feed = document.getElementById('regulatory-feed');
   feed.innerHTML = REGULATORY.map(item => {{
     const date = item.published_at ? item.published_at.slice(0,10) : '';
-    const catLabel = CAT_LABELS[item.category] || item.category;
-    const regionLabel = REGION_LABELS[item.region] || item.region;
     return `<div class="feed-item" style="border-left-color:#ef4444">
       <div class="item-header">
         <h4><a href="${{item.url || '#'}}" target="_blank" rel="noopener">${{item.title || '(无标题)'}}</a></h4>
@@ -363,8 +498,8 @@ function renderRegulatory() {{
       <div class="summary">${{item.summary || ''}}</div>
       <div class="meta">
         <span class="tag tag-type-regulatory">法规监管</span>
-        <span class="tag tag-cat">${{catLabel}}</span>
-        <span class="tag tag-region">${{regionLabel}}</span>
+        <span class="tag tag-cat">${{CAT_LABELS[item.category]||item.category}}</span>
+        <span class="tag tag-region">${{REGION_LABELS[item.region]||item.region}}</span>
         <span class="item-source">${{item.source || ''}}</span>
         <span class="item-date">${{date}}</span>
       </div>
@@ -384,47 +519,37 @@ function renderLog() {{
 }}
 
 function initCharts() {{
-  // Category chart
   const catCtx = document.getElementById('cat-chart').getContext('2d');
   new Chart(catCtx, {{
     type: 'doughnut',
     data: {{
       labels: CAT_COUNTS.map(r => CAT_LABELS[r.category]||r.category),
       datasets: [{{ data: CAT_COUNTS.map(r => r.cnt),
-        backgroundColor: CAT_COUNTS.map(r => CAT_COLORS[r.category]||'#64748b'),
-        borderWidth: 0 }}]
+        backgroundColor: CAT_COUNTS.map(r => CAT_COLORS[r.category]||'#64748b'), borderWidth: 0 }}]
     }},
     options: {{ plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font: {{size:11}} }} }} }}, maintainAspectRatio: false }}
   }});
 
-  // Region chart
   const regCtx = document.getElementById('region-chart').getContext('2d');
   new Chart(regCtx, {{
     type: 'doughnut',
     data: {{
       labels: REGION_COUNTS.map(r => REGION_LABELS[r.region]||r.region),
       datasets: [{{ data: REGION_COUNTS.map(r => r.cnt),
-        backgroundColor: REGION_COUNTS.map(r => REGION_COLORS[r.region]||'#64748b'),
-        borderWidth: 0 }}]
+        backgroundColor: REGION_COUNTS.map(r => REGION_COLORS[r.region]||'#64748b'), borderWidth: 0 }}]
     }},
     options: {{ plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font: {{size:11}} }} }} }}, maintainAspectRatio: false }}
   }});
 
-  // Trend chart — aggregate daily total
   const days = [...new Set(TREND.map(r => r.day))].sort();
   const cats = ['sweeteners','colorants','flavors','functional_ingredients','general'];
-  const catColorMap = CAT_COLORS;
   const datasets = cats.map(cat => ({{
     label: CAT_LABELS[cat]||cat,
-    data: days.map(day => {{
-      const row = TREND.find(r => r.day===day && r.category===cat);
-      return row ? row.cnt : 0;
-    }}),
-    borderColor: catColorMap[cat]||'#64748b',
-    backgroundColor: (catColorMap[cat]||'#64748b')+'33',
+    data: days.map(day => {{ const row = TREND.find(r => r.day===day && r.category===cat); return row ? row.cnt : 0; }}),
+    borderColor: CAT_COLORS[cat]||'#64748b',
+    backgroundColor: (CAT_COLORS[cat]||'#64748b')+'33',
     fill: true, tension: 0.3, pointRadius: 0,
   }}));
-
   const trendCtx = document.getElementById('trend-chart').getContext('2d');
   new Chart(trendCtx, {{
     type: 'line',
@@ -440,7 +565,6 @@ function initCharts() {{
   }});
 }}
 
-// Init
 renderStats();
 renderFeed();
 </script>
